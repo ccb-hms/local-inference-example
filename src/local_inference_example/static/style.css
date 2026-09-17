@@ -105,6 +105,13 @@ body {
   max-width: 100%;
   min-width: 0;
   word-wrap: break-word;
+  /* .messages is a column flex container with more content than fits, so
+     its children are flex items that flexbox will otherwise try to shrink
+     to make everything fit - down to a minimum height of 0 for any bubble
+     with overflow:hidden (.message.api_call), which is what was crushing
+     it to a sliver instead of just letting .messages scroll. Bubbles
+     should always render at their natural height; the container scrolls. */
+  flex-shrink: 0;
 }
 
 .message.user {
