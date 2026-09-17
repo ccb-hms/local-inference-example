@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>local-inference-example</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@7"></script>
+</head>
+<body>
+  <main class="layout">
+    <section class="chat-panel">
+      <header>
+        <h1>local-inference-example</h1>
+        <p>Ask about a gene, e.g. "where is BRCA1 expressed?"</p>
+      </header>
+      <div id="messages" class="messages"></div>
+      <form id="chat-form" class="chat-form">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="Ask a question..."
+          autocomplete="off"
+        />
+        <button type="submit">Send</button>
+      </form>
+    </section>
+    <section class="chart-panel">
+      <div id="chart" class="chart"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
