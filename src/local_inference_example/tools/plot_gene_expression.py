@@ -41,13 +41,18 @@ def _profile_chart(df: pd.DataFrame, gene: str, highlight_tissue: str | None) ->
         df.groupby("tissue_label")["tpm"].median().sort_values(ascending=False).index.tolist()
     )
     return (
+        # Horizontal orientation: 54 tissue names read far more comfortably
+        # down a y-axis than crammed and rotated along an x-axis.
         alt.Chart(df)
-        .mark_boxplot(size=10, median={"color": "black", "strokeWidth": 1.5})
+        .mark_boxplot(size=12, median={"color": "black", "strokeWidth": 1.5})
         .encode(
-            x=alt.X(
-                "tissue_label:N", sort=tissue_order, title=None, axis=alt.Axis(labelAngle=-60)
-            ),
             y=alt.Y(
+                "tissue_label:N",
+                sort=tissue_order,
+                title=None,
+                axis=alt.Axis(labelFontSize=12),
+            ),
+            x=alt.X(
                 "tpm_adj:Q",
                 title="TPM + 0.01 (log scale)",
                 scale=alt.Scale(type="log"),
@@ -61,7 +66,7 @@ def _profile_chart(df: pd.DataFrame, gene: str, highlight_tissue: str | None) ->
         )
         .properties(
             width="container",
-            height=380,
+            height=alt.Step(20),  # fixed per-tissue row height - explicit "breathing room"
             title=f"{gene} expression across GTEx tissues (per-sample TPM)",
         )
     )
@@ -92,6 +97,6 @@ def plot_gene_expression(gene: str, highlight_tissue: str | None = None) -> Tool
             "tissue_count": int(df["tissue"].nunique()),
             "sample_count": len(df),
             "mark": "boxplot",
-            "y_scale": "log",
+            "log_scale_axis": "x",
         },
     )
