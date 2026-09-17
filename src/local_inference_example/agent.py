@@ -9,9 +9,12 @@ it's fixed structurally instead of by post-hoc parsing.
 
 from __future__ import annotations
 
+import inspect
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, Union
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import BaseModel, Field
 
@@ -192,6 +195,9 @@ class ChatModel(Protocol):
 class TranscriptEntry:
     kind: Literal["thinking", "action", "api_call", "observation", "final"]
     text: str
+    # What to show in the "inspector" panel if this entry is the active one:
+    # {"type": "code" | "api" | "data" | "json", "language": ..., "content": ...}
+    detail: dict | None = None
 
 
 @dataclass
@@ -212,6 +218,43 @@ def _describe_call(step: ToolCall) -> str:
         highlight = f", highlighting '{step.highlight_tissue}'" if step.highlight_tissue else ""
         return f"Calling plot_gene_expression(gene='{step.gene}'{highlight}) - building the chart..."
     return "Calling get_time() - reading the system clock..."
+
+
+def _call_detail(step: Union[ToolCall, FinalAnswer]) -> dict:
+    """What actually runs for this step: the tool's own source code, or (for
+    final_answer, which has no tool function) the raw JSON the model
+    produced."""
+    if isinstance(step, FinalAnswer):
+        return {"type": "json", "language": "json", "content": step.model_dump_json(indent=2)}
+    try:
+        content = inspect.getsource(TOOLS[step.tool])
+    except (OSError, TypeError, KeyError):
+        content = "# source unavailable"
+    return {"type": "code", "language": "python", "content": content}
+
+
+def _api_detail(api_url: str) -> dict:
+    """The request that actually ran, broken into method/endpoint/params
+    instead of one long query string."""
+    parts = urlsplit(api_url)
+    payload = {
+        "method": "GET",
+        "endpoint": f"{parts.scheme}://{parts.netloc}{parts.path}",
+        "params": dict(parse_qsl(parts.query)),
+    }
+    return {"type": "api", "language": "json", "content": json.dumps(payload, indent=2)}
+
+
+def _data_detail(result: ToolResult) -> dict | None:
+    """A real look at the data behind this tool's text summary, if it
+    captured one."""
+    if result.raw_data is None:
+        return None
+    return {
+        "type": "data",
+        "language": "json",
+        "content": json.dumps(result.raw_data, indent=2, default=str),
+    }
 
 
 def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentResult:
@@ -237,14 +280,19 @@ def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentRe
         messages.append({"role": "assistant", "content": step.model_dump_json()})
 
         if isinstance(step, FinalAnswer):
-            transcript.append(TranscriptEntry("final", step.answer))
+            transcript.append(
+                TranscriptEntry(
+                    "action", "Calling final_answer(...) - wrapping up...", _call_detail(step)
+                )
+            )
+            transcript.append(TranscriptEntry("final", step.answer, _call_detail(step)))
             return AgentResult(
                 answer=step.answer,
                 transcript=transcript,
                 chart=last_result.chart if last_result else None,
             )
 
-        transcript.append(TranscriptEntry("action", _describe_call(step)))
+        transcript.append(TranscriptEntry("action", _describe_call(step), _call_detail(step)))
 
         # A small model can get stuck re-issuing the same tool call instead
         # of moving on to a final_answer. Rather than burn the whole step
@@ -263,8 +311,14 @@ def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentRe
         tool = TOOLS[step.tool]
         last_result = tool(**step.model_dump(exclude={"tool"}))
         if last_result.api_url:
-            transcript.append(TranscriptEntry("api_call", last_result.api_url))
-        transcript.append(TranscriptEntry("observation", f"Data returned: {last_result.text}"))
+            transcript.append(
+                TranscriptEntry("api_call", last_result.api_url, _api_detail(last_result.api_url))
+            )
+        transcript.append(
+            TranscriptEntry(
+                "observation", f"Data returned: {last_result.text}", _data_detail(last_result)
+            )
+        )
         messages.append({"role": "user", "content": f"Observation: {last_result.text}"})
 
     answer = f"(gave up after {max_steps} steps; last observation: {last_result.text if last_result else 'none'})"

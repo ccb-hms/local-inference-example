@@ -9,5 +9,5 @@ from . import ToolResult
 
 def get_time() -> ToolResult:
     """Return the current local date and time."""
-    now = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
-    return ToolResult(text=now)
+    now = datetime.datetime.now()
+    return ToolResult(text=now.strftime("%A, %Y-%m-%d %H:%M:%S"), raw_data={"iso": now.isoformat()})

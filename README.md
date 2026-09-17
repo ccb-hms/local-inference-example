@@ -72,12 +72,22 @@ flowchart TD
     Resolve -. "gene not found" .-> Final
 ```
 
-Every tool call is narrated into the chat as three colored bubbles: yellow
-for the call itself, purple for the exact API URL it hit (ellipsis-
-truncated, click through to check it yourself), green for what came back.
-`plot_gene_expression` also takes an optional `highlight_tissue` argument -
-ask something like *"where is INS expressed, highlight the pancreas"* and
-the model can call it out in red on the chart.
+Every step - including the model's final answer - is narrated into the
+chat as a colored bubble: yellow for the call itself (even
+`final_answer` gets one), purple for the exact API URL it hit
+(ellipsis-truncated, click through to check it yourself), green for the
+data that came back, blue for the answer. `plot_gene_expression` also
+takes an optional `highlight_tissue` argument - ask something like
+*"where is INS expressed, highlight the pancreas"* and the model can call
+it out in red on the chart.
+
+Click any bubble (or just watch as they appear) and a panel below the
+chart shows exactly what that step really did - the tool's actual Python
+source for a yellow bubble, the request broken into method/endpoint/params
+for a purple one, the real JSON GTEx returned for a green one - color-coded
+to match. Nothing here is simulated or summarized after the fact: it's the
+same `ToolResult` object the agent loop itself used, serialized straight
+into the response.
 
 ## The model is only told what skills/*.md says
 

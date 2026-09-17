@@ -7,10 +7,14 @@
   --accent: #4c72b0;
   --accent-bg: #eaf0f9;
   --action-bg: #fff6e5;
+  --action-accent: #d9a02c;
   --api-bg: #f1eaf9;
   --api-text: #6b3fa0;
+  --api-accent: #8e5cc4;
   --observation-bg: #e9f5ec;
+  --observation-accent: #3f9d5f;
   --error-bg: #fdeceb;
+  --code-bg: #f7f7f8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,10 +27,14 @@
     --accent: #7aa2d8;
     --accent-bg: #2a3542;
     --action-bg: #3a3324;
+    --action-accent: #d9a02c;
     --api-bg: #332a40;
     --api-text: #c8a6ec;
+    --api-accent: #a97fe0;
     --observation-bg: #223229;
+    --observation-accent: #5fbf82;
     --error-bg: #402b2a;
+    --code-bg: #17181a;
   }
 }
 
@@ -154,6 +162,20 @@ body {
   border: 1px solid var(--accent);
 }
 
+.message.has-detail {
+  cursor: pointer;
+}
+
+.message.has-detail:hover {
+  filter: brightness(0.96);
+}
+
+@media (prefers-color-scheme: dark) {
+  .message.has-detail:hover {
+    filter: brightness(1.15);
+  }
+}
+
 .chat-form {
   display: flex;
   gap: 8px;
@@ -187,13 +209,22 @@ body {
   cursor: default;
 }
 
-.chart-panel {
+.right-panel {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chart-panel {
+  flex: 1 1 50%;
   display: flex;
   align-items: flex-start;
   overflow: auto;
   padding: 24px;
   min-width: 0;
+  min-height: 0;
 }
 
 .chart {
@@ -204,4 +235,59 @@ body {
 .chart-placeholder {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.detail-panel {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-top: 3px solid var(--border);
+  background: var(--code-bg);
+}
+
+.detail-panel.kind-action {
+  border-top-color: var(--action-accent);
+}
+
+.detail-panel.kind-api_call {
+  border-top-color: var(--api-accent);
+}
+
+.detail-panel.kind-observation {
+  border-top-color: var(--observation-accent);
+}
+
+.detail-panel.kind-final {
+  border-top-color: var(--accent);
+}
+
+.detail-header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.detail-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detail-body {
+  flex: 1;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.detail-body code {
+  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  background: transparent !important;
 }
