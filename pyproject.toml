@@ -1,7 +1,7 @@
 [project]
 name = "local-inference-example"
 version = "0.1.0"
-description = "Add your description here"
+description = "A local-LLM agent demo: a small model calling real GTEx API tools, in a browser chat + chart UI"
 authors = [
     { name = "Jane Adams", email = "jane_adams@hms.harvard.edu" }
 ]
