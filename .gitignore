@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+.python-version.local
+.DS_Store
+.env
