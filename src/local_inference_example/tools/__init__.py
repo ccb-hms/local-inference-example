@@ -15,6 +15,7 @@ class ToolResult:
     text: str
     chart: dict | None = None  # a Vega-Lite spec (alt.Chart.to_dict()), if this tool made one
     api_url: str | None = None  # the exact request URL this call made, if it called an API
+    raw_data: object | None = None  # a small, JSON-serializable look at the real data behind `text`
 
 
 from .fetch_gene_expression import fetch_gene_expression  # noqa: E402

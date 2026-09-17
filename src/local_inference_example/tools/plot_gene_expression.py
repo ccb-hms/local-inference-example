@@ -86,4 +86,12 @@ def plot_gene_expression(gene: str, highlight_tissue: str | None = None) -> Tool
         text=f"Rendered {canonical_symbol}'s expression chart across GTEx tissues{highlight_note}.",
         chart=chart.to_dict(),
         api_url=api_url,
+        raw_data={
+            "gene": canonical_symbol,
+            "highlight_tissue": highlight_tissue,
+            "tissue_count": int(df["tissue"].nunique()),
+            "sample_count": len(df),
+            "mark": "boxplot",
+            "y_scale": "log",
+        },
     )

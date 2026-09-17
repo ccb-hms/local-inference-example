@@ -27,8 +27,8 @@ class GeneNotFoundError(Exception):
     pass
 
 
-def get_gencode_id(gene: str) -> tuple[str, str, str]:
-    """Return (gencodeId, canonical_symbol, api_url) for a gene."""
+def get_gencode_id(gene: str) -> tuple[str, str, str, dict]:
+    """Return (gencodeId, canonical_symbol, api_url, raw_record) for a gene."""
     resp = httpx.get(
         f"{GTEX_API}/reference/geneSearch",
         params={"geneId": gene, "gencodeVersion": GENCODE_VERSION},
@@ -44,14 +44,14 @@ def get_gencode_id(gene: str) -> tuple[str, str, str]:
         if m["geneSymbolUpper"] == gene.upper() and m["geneType"] == "protein coding"
     ]
     best = (exact or matches)[0]
-    return best["gencodeId"], best["geneSymbol"], str(resp.url)
+    return best["gencodeId"], best["geneSymbol"], str(resp.url), best
 
 
 def resolve_gene(gene: str) -> ToolResult:
     """Resolve a gene symbol (e.g. 'BRCA1') to its stable GENCODE ID - the
     identifier the rest of the pipeline actually queries GTEx with."""
     try:
-        gencode_id, canonical_symbol, api_url = get_gencode_id(gene)
+        gencode_id, canonical_symbol, api_url, record = get_gencode_id(gene)
     except GeneNotFoundError as exc:
         return ToolResult(text=f"error: {exc}")
     except httpx.HTTPError as exc:
@@ -60,4 +60,5 @@ def resolve_gene(gene: str) -> ToolResult:
     return ToolResult(
         text=f"Resolved '{gene}' to GENCODE ID {gencode_id} (canonical symbol: {canonical_symbol}).",
         api_url=api_url,
+        raw_data=record,
     )

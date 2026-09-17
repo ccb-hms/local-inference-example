@@ -32,6 +32,7 @@ class ChatRequest(BaseModel):
 class TranscriptEntryOut(BaseModel):
     kind: str
     text: str
+    detail: dict | None = None
 
 
 class ChatResponse(BaseModel):
@@ -45,7 +46,8 @@ def chat(request: ChatRequest) -> ChatResponse:
     result = run_agent(get_llm(), request.message)
     return ChatResponse(
         transcript=[
-            TranscriptEntryOut(kind=entry.kind, text=entry.text) for entry in result.transcript
+            TranscriptEntryOut(kind=entry.kind, text=entry.text, detail=entry.detail)
+            for entry in result.transcript
         ],
         answer=result.answer,
         chart=result.chart,

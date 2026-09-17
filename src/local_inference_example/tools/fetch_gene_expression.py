@@ -24,7 +24,7 @@ GTEX_API = "https://gtexportal.org/api/v2"
 def get_dataframe(gene: str) -> tuple[str, pd.DataFrame, str]:
     """Return (canonical_symbol, dataframe, api_url) for a gene, resolving
     it first."""
-    gencode_id, canonical_symbol, _resolve_url = get_gencode_id(gene)
+    gencode_id, canonical_symbol, _resolve_url, _record = get_gencode_id(gene)
     resp = httpx.get(
         f"{GTEX_API}/expression/geneExpression",
         params={"gencodeId": gencode_id, "datasetId": DATASET_ID, "itemsPerPage": 100},
@@ -52,10 +52,17 @@ def fetch_gene_expression(gene: str) -> ToolResult:
     except httpx.HTTPError as exc:
         return ToolResult(text=f"error: could not reach GTEx ({exc})")
 
+    preview_rows = 10
     return ToolResult(
         text=(
             f"Fetched {len(df)} real per-sample TPM values for {canonical_symbol} "
             f"across {df['tissue'].nunique()} GTEx tissues."
         ),
         api_url=api_url,
+        raw_data={
+            "total_samples": len(df),
+            "tissue_count": int(df["tissue"].nunique()),
+            "preview": df.head(preview_rows).to_dict(orient="records"),
+            "preview_note": f"showing {preview_rows} of {len(df)} rows",
+        },
     )

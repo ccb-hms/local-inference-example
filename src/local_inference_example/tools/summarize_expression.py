@@ -38,4 +38,16 @@ def summarize_expression(gene: str) -> ToolResult:
         f"({top_median:.2f} TPM), {specificity:.1f}x the median across all "
         f"{len(medians)} tissues."
     )
-    return ToolResult(text=text, api_url=api_url)
+    return ToolResult(
+        text=text,
+        api_url=api_url,
+        raw_data={
+            "gene": canonical_symbol,
+            "top_tissue": top_tissue,
+            "top_tissue_median_tpm": round(float(top_median), 4),
+            "cross_tissue_median_tpm": round(float(overall_median), 4),
+            "specificity_ratio": round(float(specificity), 2),
+            "tissue_count": len(medians),
+            "median_tpm_by_tissue": {k: round(float(v), 4) for k, v in medians.items()},
+        },
+    )
