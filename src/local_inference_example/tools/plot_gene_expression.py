@@ -40,6 +40,12 @@ def _profile_chart(df: pd.DataFrame, gene: str, highlight_tissue: str | None) ->
     tissue_order = (
         df.groupby("tissue_label")["tpm"].median().sort_values(ascending=False).index.tolist()
     )
+    # Many samples floor out at exactly PSEUDOCOUNT (true zero expression),
+    # so the data's own min/max would put points right at the domain edge -
+    # half-clipped by the plot boundary since a log scale's default domain
+    # is an exact fit. Pad it by a fixed log-space factor so nothing sits
+    # flush against either edge.
+    domain = [df["tpm_adj"].min() / 2, df["tpm_adj"].max() * 2]
     return (
         # Horizontal orientation: 54 tissue names read far more comfortably
         # down a y-axis than crammed and rotated along an x-axis.
@@ -55,7 +61,7 @@ def _profile_chart(df: pd.DataFrame, gene: str, highlight_tissue: str | None) ->
             x=alt.X(
                 "tpm_adj:Q",
                 title="TPM + 0.01 (log scale)",
-                scale=alt.Scale(type="log"),
+                scale=alt.Scale(type="log", domain=domain),
             ),
             color=alt.Color(
                 "highlighted:N",

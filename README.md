@@ -14,23 +14,31 @@ Works on macOS and Windows/Linux, CPU-only by default.
 A chat panel on the left, a chart panel on the right. Ask about a gene (e.g.
 *"where is BRCA1 expressed?"*) and the model - running entirely on your
 laptop - decides which tools to call, in what order, to answer you. Every
-tool call and its result is narrated into the chat as it happens; the final
-chart renders on the right.
+tool call and its result is narrated into the chat *as it actually
+happens*, over a real streaming connection - not a canned "typing" replay
+of an already-finished response.
 
 ```mermaid
 flowchart LR
     subgraph laptop["Your laptop (offline-capable)"]
-        You["You type a question"] --> UI["Browser UI\n(plain HTML/JS)"]
-        UI -- "POST /api/chat" --> Server["FastAPI server"]
+        You["You type a question"] --> UI["Browser UI\n(plain HTML/JS, EventSource)"]
+        UI -- "GET /api/chat/stream" --> Server["FastAPI server\n(Server-Sent Events)"]
         Server --> LLM["Qwen2.5-1.5B\n(local, CPU/MPS/GPU)"]
-        LLM -- "JSON tool call\n(schema-constrained)" --> Loop["agent loop"]
+        LLM -- "JSON tool call\n(schema-constrained)" --> Loop["agent loop\n(a generator)"]
         Loop --> LLM
         LLM -- "final_answer" --> Server
-        Server -- "transcript + chart" --> UI
+        Loop -. "one SSE event\nper step, live" .-> UI
     end
     Loop <-- "gene symbol" --> GTEx["GTEx Portal API\n(public, no key)"]
-    UI -- "vega-embed" --> Chart["rendered box plot"]
+    UI -- "vega-embed" --> Chart["rendered box plot,\nas soon as it's ready"]
 ```
+
+Under the hood, `run_agent_stream` in [agent.py](src/local_inference_example/agent.py)
+is a Python generator that `yield`s each step the instant it's produced;
+[server.py](src/local_inference_example/server.py) turns that into a
+Server-Sent Events response, and the browser's `EventSource` renders each
+one as it arrives. The chart itself appears the moment
+`plot_gene_expression` finishes - not only once the whole run is done.
 
 The model is [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
 (~3GB download), small enough to run on a laptop CPU with no GPU required.

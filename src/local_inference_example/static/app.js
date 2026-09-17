@@ -13,10 +13,6 @@ const DETAIL_LABELS = {
   final: "Model's final step",
 };
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // Shows one step's detail (code / API request / data) in the panel below
 // the chart. Called both live, as each step streams in, and on demand
 // when an earlier bubble is clicked - same function either way, so the
@@ -65,56 +61,54 @@ function setFormDisabled(disabled) {
   formEl.querySelector("button").disabled = disabled;
 }
 
-async function sendMessage(message) {
+function sendMessage(message) {
   addMessage("user", message);
   setFormDisabled(true);
   const thinking = addMessage("action", "Thinking...");
+  let thinkingRemoved = false;
+  let sawChart = false;
 
-  try {
-    const resp = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-    if (!resp.ok) {
-      throw new Error(`server responded with ${resp.status}`);
-    }
-    const data = await resp.json();
-    thinking.remove();
+  // Real streaming, not a replay: each "step" event is pushed by the
+  // server the instant run_agent_stream produces it, so a bubble appears
+  // exactly when that step actually happens, not after the whole run
+  // finishes and gets faked into looking live.
+  const source = new EventSource(`/api/chat/stream?message=${encodeURIComponent(message)}`);
 
-    // The backend already ran the whole agent loop - replay its steps with
-    // a short pause between each so the chat reads as "live" narration
-    // instead of a wall of text appearing all at once. The detail panel
-    // tracks along: each step with a detail payload becomes the active one
-    // as it's added, then stays there until either the next detail-bearing
-    // step arrives or the user clicks an earlier bubble.
-    for (const entry of data.transcript) {
-      if (entry.kind === "final") continue; // shown separately, below
-      addMessage(entry.kind, entry.text, entry.detail);
-      if (entry.detail) {
-        showDetail(entry.kind, entry.detail);
-      }
-      await sleep(350);
-    }
-    const finalEntry = data.transcript.find((entry) => entry.kind === "final");
-    addMessage("final", data.answer, finalEntry ? finalEntry.detail : null);
-    if (finalEntry && finalEntry.detail) {
-      showDetail("final", finalEntry.detail);
-    }
-
-    if (data.chart) {
-      chartEl.innerHTML = "";
-      await vegaEmbed("#chart", data.chart, { actions: false });
-    } else {
+  const finish = () => {
+    source.close();
+    if (!sawChart) {
       chartEl.innerHTML = '<p class="chart-placeholder">(this answer didn\'t produce a chart)</p>';
     }
-  } catch (err) {
-    thinking.remove();
-    addMessage("final", `Something went wrong: ${err.message}`);
-  } finally {
     setFormDisabled(false);
     inputEl.focus();
-  }
+  };
+
+  source.addEventListener("step", (event) => {
+    if (!thinkingRemoved) {
+      thinking.remove();
+      thinkingRemoved = true;
+    }
+    const entry = JSON.parse(event.data);
+    addMessage(entry.kind, entry.text, entry.detail);
+    if (entry.detail) {
+      showDetail(entry.kind, entry.detail);
+    }
+    if (entry.chart) {
+      sawChart = true;
+      chartEl.innerHTML = "";
+      vegaEmbed("#chart", entry.chart, { actions: false });
+    }
+  });
+
+  source.addEventListener("done", finish);
+
+  source.onerror = () => {
+    if (!thinkingRemoved) {
+      thinking.remove();
+    }
+    addMessage("final", "Something went wrong talking to the server.");
+    finish();
+  };
 }
 
 formEl.addEventListener("submit", (event) => {
