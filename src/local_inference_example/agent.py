@@ -198,6 +198,10 @@ class TranscriptEntry:
     # What to show in the "inspector" panel if this entry is the active one:
     # {"type": "code" | "api" | "data" | "json", "language": ..., "content": ...}
     detail: dict | None = None
+    # Set only on the observation entry that produced/updated the chart -
+    # lets a streaming consumer render it the moment it's ready, not just
+    # once the whole run finishes.
+    chart: dict | None = None
 
 
 @dataclass
@@ -257,72 +261,77 @@ def _data_detail(result: ToolResult) -> dict | None:
     }
 
 
-def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentResult:
-    """Run the tool-call loop until a final_answer step or the step limit."""
+def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
+    """Run the tool-call loop, yielding each TranscriptEntry the instant
+    it's produced - the real basis for "live" narration. `run_agent` below
+    just drains this generator for callers that want the whole result at
+    once instead of streaming it."""
     messages: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *FEW_SHOT_EXAMPLES,
         {"role": "user", "content": query},
     ]
-    transcript: list[TranscriptEntry] = []
     last_call: str | None = None
     last_result: ToolResult | None = None
 
     for step_num in range(max_steps):
-        transcript.append(
-            TranscriptEntry(
-                "thinking",
-                "Reading your question..." if step_num == 0 else "Deciding what to do next...",
-            )
+        yield TranscriptEntry(
+            "thinking",
+            "Reading your question..." if step_num == 0 else "Deciding what to do next...",
         )
         agent_step = llm.generate_step(messages)
         step = agent_step.step
         messages.append({"role": "assistant", "content": step.model_dump_json()})
 
         if isinstance(step, FinalAnswer):
-            transcript.append(
-                TranscriptEntry(
-                    "action", "Calling final_answer(...) - wrapping up...", _call_detail(step)
-                )
+            yield TranscriptEntry(
+                "action", "Calling final_answer(...) - wrapping up...", _call_detail(step)
             )
-            transcript.append(TranscriptEntry("final", step.answer, _call_detail(step)))
-            return AgentResult(
-                answer=step.answer,
-                transcript=transcript,
-                chart=last_result.chart if last_result else None,
-            )
+            yield TranscriptEntry("final", step.answer, _call_detail(step))
+            return
 
-        transcript.append(TranscriptEntry("action", _describe_call(step), _call_detail(step)))
+        yield TranscriptEntry("action", _describe_call(step), _call_detail(step))
 
         # A small model can get stuck re-issuing the same tool call instead
         # of moving on to a final_answer. Rather than burn the whole step
         # budget on that, fall back to the observation it already has.
         call = step.model_dump_json()
         if call == last_call:
-            answer = last_result.text if last_result else "(no result)"
-            transcript.append(TranscriptEntry("final", answer))
-            return AgentResult(
-                answer=answer,
-                transcript=transcript,
-                chart=last_result.chart if last_result else None,
-            )
+            yield TranscriptEntry("final", last_result.text if last_result else "(no result)")
+            return
         last_call = call
 
         tool = TOOLS[step.tool]
         last_result = tool(**step.model_dump(exclude={"tool"}))
         if last_result.api_url:
-            transcript.append(
-                TranscriptEntry("api_call", last_result.api_url, _api_detail(last_result.api_url))
+            yield TranscriptEntry(
+                "api_call", last_result.api_url, _api_detail(last_result.api_url)
             )
-        transcript.append(
-            TranscriptEntry(
-                "observation", f"Data returned: {last_result.text}", _data_detail(last_result)
-            )
+        yield TranscriptEntry(
+            "observation",
+            f"Data returned: {last_result.text}",
+            _data_detail(last_result),
+            chart=last_result.chart,
         )
         messages.append({"role": "user", "content": f"Observation: {last_result.text}"})
 
-    answer = f"(gave up after {max_steps} steps; last observation: {last_result.text if last_result else 'none'})"
-    transcript.append(TranscriptEntry("final", answer))
-    return AgentResult(
-        answer=answer, transcript=transcript, chart=last_result.chart if last_result else None
+    yield TranscriptEntry(
+        "final",
+        f"(gave up after {max_steps} steps; last observation: "
+        f"{last_result.text if last_result else 'none'})",
     )
+
+
+def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentResult:
+    """Run the tool-call loop to completion and return the whole result at
+    once - for callers (tests, scripts) that don't need streaming."""
+    transcript: list[TranscriptEntry] = []
+    chart: dict | None = None
+    answer = ""
+    for entry in run_agent_stream(llm, query, max_steps):
+        transcript.append(entry)
+        if entry.chart:
+            chart = entry.chart
+        if entry.kind == "final":
+            answer = entry.text
+    return AgentResult(answer=answer, transcript=transcript, chart=chart)

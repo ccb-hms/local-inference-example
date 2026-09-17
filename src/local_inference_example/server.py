@@ -1,15 +1,17 @@
-"""FastAPI backend: one endpoint that runs the agent loop, plus static files
-for the plain-JS chat + chart frontend."""
+"""FastAPI backend: streams the agent loop over Server-Sent Events as each
+step actually happens, plus static files for the plain-JS chat + chart
+frontend."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
-from .agent import run_agent
+from .agent import run_agent_stream
 from .model import LocalLLM
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -25,33 +27,32 @@ def get_llm() -> LocalLLM:
     return _llm
 
 
-class ChatRequest(BaseModel):
-    message: str
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-class TranscriptEntryOut(BaseModel):
-    kind: str
-    text: str
-    detail: dict | None = None
+@app.get("/api/chat/stream")
+def chat_stream(message: str) -> StreamingResponse:
+    """Server-Sent Events: one "step" event per TranscriptEntry, the
+    instant run_agent_stream produces it - not a replay of an
+    already-finished run. Model inference is blocking, but FastAPI runs a
+    sync generator like this one in a thread pool, so it doesn't block the
+    event loop for other requests."""
 
+    def events():
+        for entry in run_agent_stream(get_llm(), message):
+            yield _sse(
+                "step",
+                {
+                    "kind": entry.kind,
+                    "text": entry.text,
+                    "detail": entry.detail,
+                    "chart": entry.chart,
+                },
+            )
+        yield _sse("done", {})
 
-class ChatResponse(BaseModel):
-    transcript: list[TranscriptEntryOut]
-    answer: str
-    chart: dict | None = None
-
-
-@app.post("/api/chat", response_model=ChatResponse)
-def chat(request: ChatRequest) -> ChatResponse:
-    result = run_agent(get_llm(), request.message)
-    return ChatResponse(
-        transcript=[
-            TranscriptEntryOut(kind=entry.kind, text=entry.text, detail=entry.detail)
-            for entry in result.transcript
-        ],
-        answer=result.answer,
-        chart=result.chart,
-    )
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
