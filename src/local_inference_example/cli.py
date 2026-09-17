@@ -1,27 +1,23 @@
-"""Interactive CLI for the local-inference agent demo."""
+"""Entry point: launches the web app and opens it in a browser.
+
+The model itself loads lazily on the first chat request (see server.py),
+not at server startup, so this returns instantly.
+"""
 
 from __future__ import annotations
 
-from .agent import run_agent
-from .model import DEFAULT_MODEL, LocalLLM
+import threading
+import webbrowser
+
+import uvicorn
+
+HOST = "127.0.0.1"
+PORT = 8000
 
 
 def main() -> None:
-    print(f"Loading {DEFAULT_MODEL} (first run downloads it from Hugging Face)...")
-    llm = LocalLLM()
-    print(f"Ready on device: {llm.device}")
-    print("Ask a question - try some arithmetic, or ask for the time. Ctrl-C to quit.\n")
-
-    while True:
-        try:
-            query = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not query:
-            continue
-
-        result = run_agent(llm, query)
-        for agent_step in result.steps[:-1]:
-            print(f"  ...{agent_step.step.model_dump_json()}")
-        print(result.answer)
+    url = f"http://{HOST}:{PORT}"
+    print(f"Starting local-inference-example at {url}")
+    print("(the model loads on your first question - that'll take a moment)")
+    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    uvicorn.run("local_inference_example.server:app", host=HOST, port=PORT)
