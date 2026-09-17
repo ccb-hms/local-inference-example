@@ -25,6 +25,14 @@ function addMessage(kind, text) {
     link.rel = "noopener";
     link.title = text;
     link.textContent = text;
+    // Belt-and-suspenders: some embedded webviews don't reliably honor
+    // target="_blank" on its own. Explicitly open a new tab/window and
+    // stop the default click from navigating this one - clicking this
+    // link should never lose the conversation in the current tab.
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.open(text, "_blank", "noopener");
+    });
     el.appendChild(link);
   } else {
     el.textContent = text;
