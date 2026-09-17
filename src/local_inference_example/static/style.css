@@ -129,21 +129,11 @@ body {
 
 .message.api_call {
   background: var(--api-bg);
-  font-size: 0.78rem;
-  overflow: hidden;
-}
-
-.message.api_call a {
-  display: block;
   color: var(--api-text);
-  text-decoration: none;
+  font-size: 0.78rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.message.api_call a:hover {
-  text-decoration: underline;
 }
 
 .message.observation {

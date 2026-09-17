@@ -41,33 +41,18 @@ function addMessage(kind, text, detail) {
   if (kind === "observation" && text.includes("error:")) {
     el.classList.add("error");
   }
+  el.textContent = text;
   if (kind === "api_call") {
-    // A real, independently-checkable request URL - shown ellipsis-truncated
-    // (full URL on hover/click) rather than wrapped, so it reads as a link,
-    // not a paragraph. Built via DOM properties (not innerHTML) so nothing
-    // in the URL - which is built from the model's own tool-call arguments -
-    // can be interpreted as markup.
-    const link = document.createElement("a");
-    link.href = text;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.title = text;
-    link.textContent = text;
-    // Belt-and-suspenders: some embedded webviews don't reliably honor
-    // target="_blank" on its own. Explicitly open a new tab/window and
-    // stop the default click from navigating this one - clicking this
-    // link should never lose the conversation in the current tab.
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      window.open(text, "_blank", "noopener");
-    });
-    el.appendChild(link);
-  } else {
-    el.textContent = text;
+    // Ellipsis-truncated (see .message.api_call in style.css) - the full
+    // URL is on hover, and broken down in full in the detail panel below.
+    // Deliberately not a link: clicking opens that panel instead of
+    // navigating away to the raw GTEx page.
+    el.title = text;
+  } else if (detail) {
+    el.title = "Click to inspect this step";
   }
   if (detail) {
     el.classList.add("has-detail");
-    el.title = "Click to inspect this step";
     el.addEventListener("click", () => showDetail(kind, detail));
   }
   messagesEl.appendChild(el);
