@@ -19,9 +19,27 @@ from .tools import TOOLS
 MAX_STEPS = 4
 
 
-class CalculatorCall(BaseModel):
-    tool: Literal["calculator"]
-    expression: str = Field(description="An arithmetic expression, e.g. '12 * (3 + 4)'")
+# Curated to a handful of common GTEx tissues (of ~50 available) so the JSON
+# schema constrains the model to a *valid* tissue name, not just a string -
+# see tools.py for the full GTEx tissueSiteDetailId list this is drawn from.
+Tissue = Literal[
+    "Whole_Blood",
+    "Liver",
+    "Lung",
+    "Muscle_Skeletal",
+    "Brain_Cortex",
+    "Breast_Mammary_Tissue",
+    "Heart_Left_Ventricle",
+    "Adipose_Subcutaneous",
+    "Kidney_Cortex",
+    "Pancreas",
+]
+
+
+class VolcanoCall(BaseModel):
+    tool: Literal["volcano"]
+    tissue_a: Tissue = Field(description="Baseline tissue")
+    tissue_b: Tissue = Field(description="Comparison tissue")
 
 
 class GetTimeCall(BaseModel):
@@ -30,11 +48,11 @@ class GetTimeCall(BaseModel):
 
 class FinalAnswer(BaseModel):
     tool: Literal["final_answer"]
-    answer: str
+    answer: str = Field(max_length=300)
 
 
 class AgentStep(BaseModel):
-    step: Union[CalculatorCall, GetTimeCall, FinalAnswer] = Field(discriminator="tool")
+    step: Union[VolcanoCall, GetTimeCall, FinalAnswer] = Field(discriminator="tool")
 
 
 SYSTEM_PROMPT = """You are a helpful assistant with access to tools. On each \
@@ -42,7 +60,10 @@ turn, respond with a single JSON object describing your next step: either a \
 tool call or your final answer.
 
 Available tools:
-- calculator: evaluate an arithmetic expression, e.g. {"tool": "calculator", "expression": "12 * (3 + 4)"}
+- volcano: compare a panel of tissue-marker genes between two tissues using \
+real public gene-expression data (GTEx) and produce a volcano plot (log2 \
+fold change vs. significance), e.g. \
+{"tool": "volcano", "tissue_a": "Liver", "tissue_b": "Pancreas"}
 - get_time: get the current local date and time, e.g. {"tool": "get_time"}
 
 Once you know the answer, respond with: {"tool": "final_answer", "answer": "..."}
@@ -54,10 +75,28 @@ Respond with exactly one JSON object and nothing else.
 # call with a final_answer instead of, say, calling another tool out of
 # habit. This one-shot example is prepended to every conversation.
 FEW_SHOT_EXAMPLE: list[dict[str, str]] = [
-    {"role": "user", "content": "What is 6 times 7?"},
-    {"role": "assistant", "content": '{"tool": "calculator", "expression": "6 * 7"}'},
-    {"role": "user", "content": "Observation: 42"},
-    {"role": "assistant", "content": '{"tool": "final_answer", "answer": "42"}'},
+    {"role": "user", "content": "Compare gene expression between blood and pancreas."},
+    {
+        "role": "assistant",
+        "content": '{"tool": "volcano", "tissue_a": "Whole_Blood", "tissue_b": "Pancreas"}',
+    },
+    {
+        "role": "user",
+        "content": (
+            "Observation: Compared 12 marker genes between Whole_Blood and Pancreas. "
+            "Most enriched in Pancreas: INS (log2FC=13.17). Most enriched in Whole_Blood: "
+            "HBB (log2FC=-12.54). Interactive volcano plot saved to "
+            "output/volcano_Whole_Blood_vs_Pancreas.html"
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            '{"tool": "final_answer", "answer": "INS (insulin) is the most pancreas-'
+            'enriched marker gene and HBB (hemoglobin) the most blood-enriched - see '
+            'output/volcano_Whole_Blood_vs_Pancreas.html"}'
+        ),
+    },
 ]
 
 
@@ -71,7 +110,7 @@ class AgentResult:
     steps: list[AgentStep] = field(default_factory=list)
 
 
-def _run_tool(step: Union[CalculatorCall, GetTimeCall]) -> str:
+def _run_tool(step: Union[VolcanoCall, GetTimeCall]) -> str:
     tool = TOOLS[step.tool]
     kwargs = step.model_dump(exclude={"tool"})
     return str(tool(**kwargs))

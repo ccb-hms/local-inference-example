@@ -10,7 +10,10 @@ def main() -> None:
     print(f"Loading {DEFAULT_MODEL} (first run downloads it from Hugging Face)...")
     llm = LocalLLM()
     print(f"Ready on device: {llm.device}")
-    print("Ask a question - try some arithmetic, or ask for the time. Ctrl-C to quit.\n")
+    print(
+        "Ask a question - try comparing gene expression between two tissues "
+        "(e.g. blood and pancreas), or ask for the time. Ctrl-C to quit.\n"
+    )
 
     while True:
         try:
