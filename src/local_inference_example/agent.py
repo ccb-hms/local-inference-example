@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import inspect
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol, Union
 from urllib.parse import parse_qsl, urlsplit
@@ -204,13 +204,6 @@ class TranscriptEntry:
     chart: dict | None = None
 
 
-@dataclass
-class AgentResult:
-    answer: str
-    transcript: list[TranscriptEntry] = field(default_factory=list)
-    chart: dict | None = None
-
-
 def _describe_call(step: ToolCall) -> str:
     if isinstance(step, ResolveGeneCall):
         return f"Calling resolve_gene(gene='{step.gene}') - looking up its GENCODE ID..."
@@ -263,9 +256,7 @@ def _data_detail(result: ToolResult) -> dict | None:
 
 def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
     """Run the tool-call loop, yielding each TranscriptEntry the instant
-    it's produced - the real basis for "live" narration. `run_agent` below
-    just drains this generator for callers that want the whole result at
-    once instead of streaming it."""
+    it's produced - the real basis for "live" narration."""
     messages: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *FEW_SHOT_EXAMPLES,
@@ -320,18 +311,3 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
         f"(gave up after {max_steps} steps; last observation: "
         f"{last_result.text if last_result else 'none'})",
     )
-
-
-def run_agent(llm: ChatModel, query: str, max_steps: int = MAX_STEPS) -> AgentResult:
-    """Run the tool-call loop to completion and return the whole result at
-    once - for callers (tests, scripts) that don't need streaming."""
-    transcript: list[TranscriptEntry] = []
-    chart: dict | None = None
-    answer = ""
-    for entry in run_agent_stream(llm, query, max_steps):
-        transcript.append(entry)
-        if entry.chart:
-            chart = entry.chart
-        if entry.kind == "final":
-            answer = entry.text
-    return AgentResult(answer=answer, transcript=transcript, chart=chart)

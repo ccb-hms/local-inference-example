@@ -1,13 +1,30 @@
 # local-inference-example
 
-A short, hands-on demo for the CCB "APIs and Local Inference" workshop
-([AI-45](https://ccb-hms.atlassian.net/browse/AI-45)): download a small
-open-weight model from Hugging Face, run inference entirely on your own
-laptop (no API key, no internet needed for the model itself after the first
-download), and wrap it in a minimal tool-using ("agentic") loop that calls a
-real public bioinformatics API - with a browser UI so you can watch it work.
+A short, hands-on demo: download a small open-weight model from Hugging
+Face, run inference entirely on your own laptop (no API key, no internet
+needed for the model itself after the first download), and wrap it in a
+minimal tool-using ("agentic") loop that calls a real public bioinformatics
+API - with a browser UI so you can watch it work.
 
 Works on macOS and Windows/Linux, CPU-only by default.
+
+## Quickstart
+
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/)
+(works the same on macOS and Windows).
+
+```bash
+git clone git@github.com:ccb-hms/local-inference-example.git
+cd local-inference-example
+uv sync
+uv run local-inference-example
+```
+
+This starts a local web server and opens it in your browser
+(http://127.0.0.1:8000). The model loads on your first question, not at
+startup - that first response will take longer while it downloads (~3GB,
+cached under `~/.cache/huggingface` for next time) and loads. Every question
+after that still needs internet, since the tools query GTEx live.
 
 ## What it does
 
@@ -33,15 +50,15 @@ flowchart LR
     UI -- "vega-embed" --> Chart["rendered box plot,\nas soon as it's ready"]
 ```
 
-Under the hood, `run_agent_stream` in [agent.py](src/local_inference_example/agent.py)
-is a Python generator that `yield`s each step the instant it's produced;
+`run_agent_stream` in [agent.py](src/local_inference_example/agent.py) is a
+Python generator that `yield`s each step the instant it's produced;
 [server.py](src/local_inference_example/server.py) turns that into a
 Server-Sent Events response, and the browser's `EventSource` renders each
 one as it arrives. The chart itself appears the moment
 `plot_gene_expression` finishes - not only once the whole run is done.
 
-The model is [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
-(~3GB download), small enough to run on a laptop CPU with no GPU required.
+The model is [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct),
+small enough to run on a laptop CPU with no GPU required.
 
 ## The pipeline is four atomic tools, not one
 
@@ -59,15 +76,16 @@ step is narrated separately in the chat:
    summary (highest-expressing tissue, tissue-specificity ratio).
 4. **`plot_gene_expression`** - turns the same fetched data into an
    interactive [Altair](https://altair-viz.github.io/) box plot instead -
-   the real per-sample distribution, not just a single median bar.
+   the real per-sample distribution, not just a single median bar. Takes an
+   optional `highlight_tissue` argument - ask something like *"where is INS
+   expressed, highlight the pancreas"* and the model can call it out in red.
 
-Steps 2-4 each resolve/fetch what they need themselves if the model calls
-them out of order (or skips straight to `plot_gene_expression`), rather
-than failing. There's no caching, on purpose: every one of these calls
-really hits GTEx (each takes well under a second), so the API URL shown in
-the chat for each step - see below - is always the real request that ran,
-not a stand-in for something already fetched. A fifth tool, `get_time`,
-exists purely to show that not every tool call has to hit a public API.
+Each step resolves/fetches what it needs itself if the model calls them out
+of order (or skips straight to `plot_gene_expression`), rather than failing.
+There's no caching, on purpose: every call really hits GTEx (each takes well
+under a second), so the API URL shown in the chat is always the real
+request that ran. A fifth tool, `get_time`, exists purely to show that not
+every tool call has to hit a public API.
 
 ```mermaid
 flowchart TD
@@ -80,22 +98,16 @@ flowchart TD
     Resolve -. "gene not found" .-> Final
 ```
 
-Every step - including the model's final answer - is narrated into the
-chat as a colored bubble: yellow for the call itself (even
-`final_answer` gets one), purple for the exact API URL it hit
-(ellipsis-truncated, click through to check it yourself), green for the
-data that came back, blue for the answer. `plot_gene_expression` also
-takes an optional `highlight_tissue` argument - ask something like
-*"where is INS expressed, highlight the pancreas"* and the model can call
-it out in red on the chart.
-
-Click any bubble (or just watch as they appear) and a panel below the
-chart shows exactly what that step really did - the tool's actual Python
-source for a yellow bubble, the request broken into method/endpoint/params
-for a purple one, the real JSON GTEx returned for a green one - color-coded
-to match. Nothing here is simulated or summarized after the fact: it's the
-same `ToolResult` object the agent loop itself used, serialized straight
-into the response.
+Every step - including the model's final answer - is narrated as a colored
+chat bubble: yellow for the call itself, purple for the exact API URL it hit
+(ellipsis-truncated, hover for the full thing), green for the data that came
+back, blue for the answer. Click any bubble (or just watch as they appear)
+and a panel below the chart shows exactly what that step really did - the
+tool's actual Python source for a yellow bubble, the request broken into
+method/endpoint/params for a purple one, the real JSON GTEx returned for a
+green one - color-coded to match. Nothing here is simulated or summarized
+after the fact: it's the same `ToolResult` object the agent loop used,
+serialized straight into the stream.
 
 ## The model is only told what skills/*.md says
 
@@ -117,30 +129,6 @@ Every JSON object the model emits is additionally constrained by
 be a syntactically well-formed tool call or final answer, no regex-parsing
 of free-form text required. It can still pick the *wrong* tool, or waste a
 step on `get_time` - the schema guarantees syntax, not judgment.
-
-## Setup
-
-Requires [uv](https://docs.astral.sh/uv/getting-started/installation/)
-(works the same on macOS and Windows).
-
-```bash
-git clone git@github.com:ccb-hms/local-inference-example.git
-cd local-inference-example
-uv sync
-```
-
-## Run
-
-```bash
-uv run local-inference-example
-```
-
-This starts a local web server and opens it in your browser
-(http://127.0.0.1:8000). The model loads on your first question, not at
-startup - the first response will take longer while it downloads
-(~3GB, cached under `~/.cache/huggingface` for next time) and loads.
-Every question after that still needs internet, since the tools query GTEx
-live.
 
 ## Swapping in a different model
 
