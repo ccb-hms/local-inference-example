@@ -236,6 +236,31 @@ FEW_SHOT_EXAMPLES: list[dict[str, str]] = [
             'putamen (basal ganglia), about 8.1x the median across all 54 GTEx tissues"}'
         ),
     },
+    {"role": "user", "content": "where is the huntingtons gene expressed?"},
+    {"role": "assistant", "content": '{"tool": "resolve_gene", "gene": "HTT"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: Resolved 'HTT' to GENCODE ID ENSG00000197386.15 "
+            "(canonical symbol: HTT)."
+        ),
+    },
+    {"role": "assistant", "content": '{"tool": "summarize_expression", "gene": "HTT"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: HTT: highest median expression in Brain_Cerebellum "
+            "(15.6 TPM), 1.7x the median across all 54 tissues."
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            '{"tool": "final_answer", "answer": "The gene most strongly linked to '
+            'Huntington\'s disease is HTT. It is most highly expressed in the '
+            'cerebellum, about 1.7x the median across all 54 GTEx tissues"}'
+        ),
+    },
     {"role": "user", "content": "How about the gene FOOBARBAZ?"},
     {"role": "assistant", "content": '{"tool": "resolve_gene", "gene": "FOOBARBAZ"}'},
     {
