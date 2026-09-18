@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import outlines
 import torch
+from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .agent import AgentStep
@@ -37,8 +38,14 @@ class LocalLLM:
     def __init__(self, model_name: str = DEFAULT_MODEL, max_new_tokens: int = 200):
         self.max_new_tokens = max_new_tokens  # cap on how much text the model can generate per step
         self.device = pick_device()
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)  # converts text <-> tokens
-        hf_model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)  # downloads the model
+        # huggingface_hub prints its own per-file tqdm bars for the actual
+        # download; this outer bar just tracks the two loading steps so
+        # there's visible progress even once the weights are cached.
+        with tqdm(total=2, desc=f"Loading {model_name}", unit="step") as progress:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)  # converts text <-> tokens
+            progress.update(1)
+            hf_model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)  # downloads the model
+            progress.update(1)
         self.model = outlines.from_transformers(hf_model, self.tokenizer)
         # A generator that's guaranteed to only ever produce valid AgentStep JSON.
         self.generator = outlines.Generator(self.model, AgentStep)

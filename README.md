@@ -20,11 +20,11 @@ uv sync
 uv run local-inference-example
 ```
 
-This starts a local web server and opens it in your browser
-(http://127.0.0.1:8000). The model loads on your first question, not at
-startup - that first response will take longer while it downloads (~3GB,
-cached under `~/.cache/huggingface` for next time) and loads. Every question
-after that still needs internet, since the tools query GTEx live.
+`uv run` downloads the model before it opens the browser (~3GB, cached
+under `~/.cache/huggingface` for next time), with a progress bar so you can
+watch how long it's got left. After that, http://127.0.0.1:8000 opens with
+the model already loaded and ready to answer. Every question still needs
+internet, since the tools query GTEx live.
 
 ## What it does
 
@@ -143,6 +143,16 @@ often skips a step or loops instead of giving a final answer - a good
 illustration of the difference between constraining a model's *syntax*
 versus its *judgment*. For any other model, change `MODEL_SIZES` in
 [model.py](src/local_inference_example/model.py).
+
+## Freeing disk space
+
+The downloaded weights (~1-3GB per size) sit in your shared Hugging Face
+cache under `~/.cache/huggingface`. To delete just the models this project
+downloaded, without touching any other cached models:
+
+```bash
+uv run python scripts/clean_models.py
+```
 
 ## Workshop notes
 

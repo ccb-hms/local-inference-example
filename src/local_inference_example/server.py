@@ -17,12 +17,12 @@ from .model import DEFAULT_MODEL, LocalLLM
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="local-inference-example")
-_llm: LocalLLM | None = None  # not loaded until the first question comes in
+_llm: LocalLLM | None = None  # loaded eagerly by cli.main() before the server starts
 model_name = DEFAULT_MODEL
 
 
 def get_llm() -> LocalLLM:
-    """Load the model on first use, then reuse the same instance for every later request."""
+    """Load the model on first call, then reuse the same instance for every later request."""
     global _llm
     if _llm is None:
         _llm = LocalLLM(model_name=model_name)
