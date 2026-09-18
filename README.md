@@ -1,10 +1,20 @@
-# local-inference-example
+# Local Inference Example
 
-A short, hands-on demo: download a small open-weight model from Hugging
-Face, run inference entirely on your own laptop (no API key, no internet
-needed for the model itself after the first download), and wrap it in a
-minimal tool-using ("agentic") loop that calls a real public bioinformatics
-API - with a browser UI so you can watch it work.
+A hands-on demo: download a small open-weight model from Hugging Face,
+run it entirely on your own laptop, and wrap it in a minimal tool-using
+("agentic") loop that calls a real public bioinformatics API, with a
+browser UI so you can watch it work.
+
+Running the model locally instead of through a hosted API buys you:
+
+- **Offline-capable.** After the first download, the model itself needs
+  no internet; only the tools' calls to the public GTEx API do.
+- **Private.** Your prompts and the model's reasoning never leave your
+  laptop; no API key, no request logs on someone else's server.
+- **Observable.** The weights are open, so every step, prompt, and tool
+  call in this repo is something you can actually inspect and modify.
+- **Customizable.** Swap the model, edit a tool's schema, or change the
+  prompt directly, no vendor API to work around.
 
 Works on macOS and Windows/Linux, CPU-only by default.
 
@@ -29,11 +39,11 @@ internet, since the tools query GTEx live.
 ## What it does
 
 A chat panel on the left, a chart panel on the right. Ask about a gene (e.g.
-*"where is BRCA1 expressed?"*) and the model - running entirely on your
-laptop - decides which tools to call, in what order, to answer you. Every
+*"where is BRCA1 expressed?"*) and the model, running entirely on your
+laptop, decides which tools to call, in what order, to answer you. Every
 tool call and its result is narrated into the chat *as it actually
-happens*, over a real streaming connection - not a canned "typing" replay
-of an already-finished response.
+happens*, over a real streaming connection: you're watching the agent loop
+run live, token by token.
 
 ![Demo: asking the local model a gene expression question and watching it call tools live, ending in a rendered chart](assets/demo.gif)
 
@@ -57,29 +67,29 @@ Python generator that `yield`s each step the instant it's produced;
 [server.py](src/local_inference_example/server.py) turns that into a
 Server-Sent Events response, and the browser's `EventSource` renders each
 one as it arrives. The chart itself appears the moment
-`plot_gene_expression` finishes - not only once the whole run is done.
+`plot_gene_expression` finishes, well before the whole run is done.
 
 The model is [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct),
 small enough to run on a laptop CPU with no GPU required.
 
-## The pipeline is four atomic tools, not one
+## The pipeline is four atomic tools
 
-A real gene-expression lookup isn't one opaque function - it's a chain of
-distinct steps, each of which can be inspected (or fail) on its own. Each
-is its own file in [tools/](src/local_inference_example/tools/), and each
-step is narrated separately in the chat:
+A real gene-expression lookup is a chain of distinct steps, each of which
+can be inspected (or fail) on its own. Each is its own file in
+[tools/](src/local_inference_example/tools/), and each step is narrated
+separately in the chat:
 
-1. **`resolve_gene`** - a gene symbol like `BRCA1` isn't a stable ID; GTEx
+1. **`resolve_gene`**: a gene symbol like `BRCA1` isn't a stable ID; GTEx
    indexes by GENCODE ID. This step looks it up (and is where a typo or a
    made-up gene name fails, cleanly).
-2. **`fetch_gene_expression`** - pure data acquisition: pulls real
+2. **`fetch_gene_expression`**: pure data acquisition, pulling real
    per-sample TPM values for that gene across all ~54 GTEx tissues.
-3. **`summarize_expression`** - turns the fetched data into a plain-text
+3. **`summarize_expression`**: turns the fetched data into a plain-text
    summary (highest-expressing tissue, tissue-specificity ratio).
-4. **`plot_gene_expression`** - turns the same fetched data into an
-   interactive [Altair](https://altair-viz.github.io/) box plot instead -
-   the real per-sample distribution, not just a single median bar. Takes an
-   optional `highlight_tissue` argument - ask something like *"where is INS
+4. **`plot_gene_expression`**: turns the same fetched data into an
+   interactive [Altair](https://altair-viz.github.io/) box plot showing the
+   real per-sample distribution instead of a single median bar. Takes an
+   optional `highlight_tissue` argument: ask something like *"where is INS
    expressed, highlight the pancreas"* and the model can call it out in red.
 
 Each step resolves/fetches what it needs itself if the model calls them out
@@ -100,14 +110,14 @@ flowchart TD
     Resolve -. "gene not found" .-> Final
 ```
 
-Every step - including the model's final answer - is narrated as a colored
+Every step, including the model's final answer, is narrated as a colored
 chat bubble: yellow for the call itself, purple for the exact API URL it hit
 (ellipsis-truncated, hover for the full thing), green for the data that came
 back, blue for the answer. Click any bubble (or just watch as they appear)
-and a panel below the chart shows exactly what that step really did - the
+and a panel below the chart shows exactly what that step really did: the
 tool's actual Python source for a yellow bubble, the request broken into
 method/endpoint/params for a purple one, the real JSON GTEx returned for a
-green one - color-coded to match. Nothing here is simulated or summarized
+green one, color-coded to match. Nothing here is simulated or summarized
 after the fact: it's the same `ToolResult` object the agent loop used,
 serialized straight into the stream.
 
@@ -115,22 +125,23 @@ serialized straight into the stream.
 
 [agent.py](src/local_inference_example/agent.py) doesn't hardcode a
 tool-description string. At startup it reads every file in
-[skills/](src/local_inference_example/skills/) - one markdown file per
-tool, with a `tool` / `description` / `call` frontmatter block - and builds
+[skills/](src/local_inference_example/skills/), one markdown file per
+tool, with a `tool` / `description` / `call` frontmatter block, and builds
 the "Available tools" section of the system prompt from that. The code
 (`tools/`) and what the model is told about it (`skills/`) are separate,
 individually editable pieces, closer to how a real agent framework (MCP
 tool descriptions, Claude Skills) separates them than a single hardcoded
 prompt string would be. Edit a `skills/*.md` file and the model's
-instructions change - no Python edit required.
+instructions change; no Python edit required.
 
 Every JSON object the model emits is additionally constrained by
 [outlines](https://github.com/dottxt-ai/outlines) to match a
 [pydantic](https://docs.pydantic.dev/) schema (`AgentStep` in
-[agent.py](src/local_inference_example/agent.py)) - so it's guaranteed to
+[agent.py](src/local_inference_example/agent.py)), so it's guaranteed to
 be a syntactically well-formed tool call or final answer, no regex-parsing
 of free-form text required. It can still pick the *wrong* tool, or waste a
-step on `get_time` - the schema guarantees syntax, not judgment.
+step on `get_time`; the schema only guarantees the call is syntactically
+valid, it says nothing about whether calling it was the right call.
 
 ## Swapping in a different model
 
@@ -141,7 +152,7 @@ uv run local-inference-example --model-size 1.5b    # default
 
 `Qwen/Qwen2.5-0.5B-Instruct` still produces syntactically valid tool calls
 (that's what the JSON schema constraint guarantees), but noticeably more
-often skips a step or loops instead of giving a final answer - a good
+often skips a step or loops instead of giving a final answer, a good
 illustration of the difference between constraining a model's *syntax*
 versus its *judgment*. For any other model, change `MODEL_SIZES` in
 [model.py](src/local_inference_example/model.py).
@@ -160,8 +171,8 @@ uv run python scripts/clean_models.py
 
 This is deliberately minimal: one small model, five tools, no agent
 framework, no database. The point is to show what an "agent loop" actually
-is under the hood - a prompt built from markdown files, a JSON schema, and
-a `while` loop - before reaching for something like LangChain or an MCP
+is under the hood: a prompt built from markdown files, a JSON schema, and
+a `while` loop, before reaching for something like LangChain or an MCP
 server.
 
 A few things worth calling out live:
@@ -169,29 +180,29 @@ A few things worth calling out live:
 - **Constrained decoding vs. model judgment.** The `AgentStep` schema
   guarantees the model's output always parses as valid JSON. It does not
   guarantee the model calls the tools in a sensible order, or stops once it
-  has enough information - see [agent.py](src/local_inference_example/agent.py)'s
+  has enough information; see [agent.py](src/local_inference_example/agent.py)'s
   stall-detection fallback, which exists because even Qwen2.5-1.5B
   occasionally re-issues the same tool call instead of answering.
-- **Step limits are a real safety mechanism, not boilerplate.** `MAX_STEPS`
+- **Step limits are a real safety mechanism.** `MAX_STEPS`
   in [agent.py](src/local_inference_example/agent.py) caps how many tool
-  calls one query can trigger - without it, a confused small model can loop
+  calls one query can trigger; without it, a confused small model can loop
   indefinitely. Splitting one tool into four raises the minimum number of
   steps a correct answer needs, so `MAX_STEPS` had to grow with it.
 - **The model never sees your data go anywhere except GTEx.** The LLM runs
   entirely on your machine; the only network calls are the tools' requests
-  to the public GTEx API, and they only ever send a gene symbol - no
+  to the public GTEx API, and they only ever send a gene symbol: no
   personal data, no query text.
-- **The tool result is real; the model's commentary on it might not be.**
+- **Check the model's commentary against the tool result it describes.**
   The gene symbol, tissue names, and TPM values in each Observation come
   straight from GTEx. But ask it to "pick a gene associated with
-  Alzheimer's" and it may confidently name one that isn't - there's no
-  search-by-disease tool, so that step is unconstrained model guesswork,
-  not grounded data. The schema constrains the *shape* of every tool call,
-  not the *judgment* behind picking `gene='ALDH7A1'` over the real
-  Alzheimer's genes (`APOE`, `APP`, `PSEN1`/`PSEN2`, `TREM2`). Worth
-  pairing every number the model reports with the chart, not just its
-  prose - and worth asking a workshop audience which parts of an answer
-  they'd trust and which they'd check.
+  Alzheimer's" and it may confidently name one that isn't correct: there's
+  no search-by-disease tool, so that step is unconstrained model guesswork.
+  The schema only constrains the *shape* of every tool call. It says
+  nothing about the *judgment* behind picking `gene='ALDH7A1'` over the
+  real Alzheimer's genes (`APOE`, `APP`, `PSEN1`/`PSEN2`, `TREM2`). Worth
+  pairing every number the model reports with the chart instead of trusting
+  its prose alone, and worth asking a workshop audience which parts of an
+  answer they'd trust and which they'd check.
 
 ## Why not just use the model's native tool-calling format?
 
@@ -200,23 +211,23 @@ tool-calling convention: pass `tools=` to `tokenizer.apply_chat_template`,
 and the model free-generates a
 `<tool_call>{"name": ..., "arguments": {...}}</tool_call>` block, which you
 parse yourself (`src/local_inference_example/native_model.py` prototypes
-exactly this). That block is JSON - but "the model output JSON" is not the
-same guarantee as "the model output JSON matching the schema our tools
-need." Nothing about the chat template stops it from naming a tool that
-doesn't exist, dropping a required argument, or emitting a tissue name
-that isn't a real GTEx tissue. That gap is what you have to close.
+exactly this). That block is JSON, but "the model output JSON" is a
+weaker guarantee than "the model output JSON matching the schema our
+tools need." Nothing about the chat template stops it from naming a tool
+that doesn't exist, dropping a required argument, or emitting a tissue
+name that isn't a real GTEx tissue. That gap is what you have to close.
 
 One way to close it: parse the JSON, then validate it against the same
 pydantic `AgentStep` schema, and retry (feeding the error back to the
 model) whenever it fails. That works, but every retry is a full extra
-generation - each failure costs real latency, and you're still only
-lowering the failure probability, not removing it.
+generation: each failure costs real latency, and you're still only
+lowering the failure probability rather than eliminating it.
 
 The other way, and what `model.py` actually does: constrain decoding
 itself with [outlines](https://github.com/dottxt-ai/outlines), which
 compiles the `AgentStep` schema into a finite-state machine and restricts
 which *tokens* the model is allowed to sample at each step. The output
-can't help but be schema-valid - there's no invalid JSON to catch, and
+can't help but be schema-valid: there's no invalid JSON to catch, and
 therefore nothing to retry.
 
 We measured the actual difference (`scripts/compare_failure_rates.py`):
@@ -233,7 +244,7 @@ retry. At 0.5B, every native failure was the same shape: for a
 zero-argument tool (`get_time`), the model emitted `{"name": "get_time"}`
 and omitted the required `"arguments"` key entirely, instead of the
 `"arguments": {}` the Hermes spec (and our validator) requires. Outlines
-can't produce that failure - the finite-state machine makes an
+can't produce that failure: the finite-state machine makes an
 empty-but-present `arguments` object structurally unavoidable, regardless
 of model size.
 
@@ -246,6 +257,6 @@ you've discovered the failure mode empirically (by shipping it, or by
 running exactly this kind of eval) and patched the prompt for it, and
 you're still paying for retries on whatever failure mode you *haven't*
 found yet. Outlines rules the whole category out by construction, before
-you've written a single test case - that's what "guarantees valid syntax
+you've written a single test case. That's what "guarantees valid syntax
 regardless of model size" (see the note above `DEFAULT_MODEL` in
 [model.py](src/local_inference_example/model.py)) is actually buying you.
