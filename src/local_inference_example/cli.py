@@ -19,5 +19,6 @@ def main() -> None:
     url = f"http://{HOST}:{PORT}"
     print(f"Starting local-inference-example at {url}")
     print("(the model loads on your first question - that'll take a moment)")
+    # Open the browser tab a moment after the server starts, once it's ready to answer.
     threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    uvicorn.run("local_inference_example.server:app", host=HOST, port=PORT)
+    uvicorn.run("local_inference_example.server:app", host=HOST, port=PORT)  # starts the web server
