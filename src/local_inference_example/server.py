@@ -12,19 +12,20 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent import run_agent_stream
-from .model import LocalLLM
+from .model import DEFAULT_MODEL, LocalLLM
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="local-inference-example")
 _llm: LocalLLM | None = None  # not loaded until the first question comes in
+model_name = DEFAULT_MODEL
 
 
 def get_llm() -> LocalLLM:
     """Load the model on first use, then reuse the same instance for every later request."""
     global _llm
     if _llm is None:
-        _llm = LocalLLM()
+        _llm = LocalLLM(model_name=model_name)
     return _llm
 
 
