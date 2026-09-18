@@ -14,7 +14,9 @@ request log sitting on someone else's server. Because the weights are
 open, you can actually inspect every prompt, step, and tool call the
 model produces, rather than treating it as a black box. And because
 nothing here depends on a vendor's API, you can swap the model, edit a
-tool's schema, or change the prompt directly.
+tool's schema, or change the prompt directly. Running the model itself
+also costs nothing beyond the electricity to run your laptop: there's no
+per-token or per-request charge, no matter how many questions you ask.
 
 It works on macOS and Windows/Linux, and runs on CPU only by default.
 
