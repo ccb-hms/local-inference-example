@@ -1,9 +1,12 @@
 """Compares two ways of getting a structured tool call out of Qwen2.5-Instruct:
 
-1. outlines: grammar-constrained decoding directly against the AgentStep
-   pydantic schema (what model.py does today).
-2. native: the model's own <tool_call> chat-template format, free-generated,
-   then parsed and validated against the same AgentStep schema.
+1. native: the model's own <tool_call> chat-template format, free-generated,
+   then parsed and validated against the AgentStep pydantic schema. Valid
+   JSON is not the same guarantee as JSON matching our schema, so this is
+   the baseline failure rate you'd be validating-and-retrying against.
+2. outlines: grammar-constrained decoding directly against the same
+   AgentStep schema (what model.py does today) - the output can't be
+   schema-invalid in the first place, so there's nothing to retry.
 
 For each approach we sample N completions per prompt (temperature > 0, no
 retries) and record whether the raw output was schema-valid on the first

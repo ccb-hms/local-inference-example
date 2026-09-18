@@ -181,42 +181,59 @@ A few things worth calling out live:
   prose - and worth asking a workshop audience which parts of an answer
   they'd trust and which they'd check.
 
-## Why outlines, and not the model's native tool-calling format?
+## Why not just use the model's native tool-calling format?
 
-Qwen2.5-Instruct ships its own tool-calling convention: pass `tools=` to
-`tokenizer.apply_chat_template`, and the model free-generates a
-`<tool_call>{"name": ..., "arguments": {...}}</tool_call>` block that you
-parse yourself. That's a real alternative to outlines' constrained
-decoding, so it's worth asking whether outlines is pulling its weight -
-"native format, then validate with pydantic" is simpler and needs one
-fewer dependency.
+The obvious starting point for tool use is Qwen2.5-Instruct's own
+tool-calling convention: pass `tools=` to `tokenizer.apply_chat_template`,
+and the model free-generates a
+`<tool_call>{"name": ..., "arguments": {...}}</tool_call>` block, which you
+parse yourself (`src/local_inference_example/native_model.py` prototypes
+exactly this). That block is JSON - but "the model output JSON" is not the
+same guarantee as "the model output JSON matching the schema our tools
+need." Nothing about the chat template stops it from naming a tool that
+doesn't exist, dropping a required argument, or emitting a tissue name
+that isn't a real GTEx tissue. That gap is what you have to close.
 
-We prototyped it (`src/local_inference_example/native_model.py`) and
-measured how often raw output validated against the same `AgentStep`
-schema on the *first try*, no retries, 8 samples per query
-(`scripts/compare_failure_rates.py`):
+One way to close it: parse the JSON, then validate it against the same
+pydantic `AgentStep` schema, and retry (feeding the error back to the
+model) whenever it fails. That works, but every retry is a full extra
+generation - each failure costs real latency, and you're still only
+lowering the failure probability, not removing it.
 
-| Model | outlines (constrained) | native `<tool_call>` + pydantic |
+The other way, and what `model.py` actually does: constrain decoding
+itself with [outlines](https://github.com/dottxt-ai/outlines), which
+compiles the `AgentStep` schema into a finite-state machine and restricts
+which *tokens* the model is allowed to sample at each step. The output
+can't help but be schema-valid - there's no invalid JSON to catch, and
+therefore nothing to retry.
+
+We measured the actual difference (`scripts/compare_failure_rates.py`):
+how often raw output validates against `AgentStep` on the *first try*, no
+retries, 8 samples per query:
+
+| Model | native `<tool_call>` + pydantic | outlines (constrained decoding) |
 |---|---|---|
 | Qwen2.5-1.5B-Instruct (default) | 32/32 (100%) | 32/32 (100%) |
-| Qwen2.5-0.5B-Instruct | 32/32 (100%) | 24/32 (75%) |
+| Qwen2.5-0.5B-Instruct | 24/32 (75%) | 32/32 (100%) |
 
-At the default 1.5B size, both approaches were equally reliable - outlines
-isn't buying anything on raw JSON-conformance there. At 0.5B, every native
-failure was the same shape: for a zero-argument tool (`get_time`), the
-model emitted `{"name": "get_time"}` and omitted the required `"arguments"`
-key entirely, which the Hermes tool-calling spec (and our validator)
-requires as `"arguments": {}`. Outlines can't produce that failure - the
-grammar makes an empty-but-present `arguments` object structurally
-unavoidable, regardless of model size.
+At the default 1.5B size, validate-and-retry would rarely even need to
+retry. At 0.5B, every native failure was the same shape: for a
+zero-argument tool (`get_time`), the model emitted `{"name": "get_time"}`
+and omitted the required `"arguments"` key entirely, instead of the
+`"arguments": {}` the Hermes spec (and our validator) requires. Outlines
+can't produce that failure - the finite-state machine makes an
+empty-but-present `arguments` object structurally unavoidable, regardless
+of model size.
 
 That specific 0.5B failure turned out to be promptable away: adding one
 sentence to the system prompt ("every tool call must include an
 `arguments` object, even for a tool with no parameters") took native's
-0.5B score from 24/32 back to 32/32. Which is the actual tradeoff: native
-+ pydantic validation *can* match outlines, but only after you've
-discovered the failure mode empirically and patched the prompt for it.
-Outlines rules the whole category out by construction, before you've
-written a single test case - that's what "guarantees valid syntax
+0.5B score from 24/32 back to 32/32. Which is the real tradeoff:
+validate-and-retry *can* get you the same reliability, but only after
+you've discovered the failure mode empirically (by shipping it, or by
+running exactly this kind of eval) and patched the prompt for it, and
+you're still paying for retries on whatever failure mode you *haven't*
+found yet. Outlines rules the whole category out by construction, before
+you've written a single test case - that's what "guarantees valid syntax
 regardless of model size" (see the note above `DEFAULT_MODEL` in
 [model.py](src/local_inference_example/model.py)) is actually buying you.
