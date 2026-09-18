@@ -35,6 +35,8 @@ tool call and its result is narrated into the chat *as it actually
 happens*, over a real streaming connection - not a canned "typing" replay
 of an already-finished response.
 
+![Demo: asking the local model a gene expression question and watching it call tools live, ending in a rendered chart](assets/demo.gif)
+
 ```mermaid
 flowchart LR
     subgraph laptop["Your laptop (offline-capable)"]
