@@ -17,10 +17,11 @@ from .model import LocalLLM
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="local-inference-example")
-_llm: LocalLLM | None = None
+_llm: LocalLLM | None = None  # not loaded until the first question comes in
 
 
 def get_llm() -> LocalLLM:
+    """Load the model on first use, then reuse the same instance for every later request."""
     global _llm
     if _llm is None:
         _llm = LocalLLM()
@@ -28,6 +29,7 @@ def get_llm() -> LocalLLM:
 
 
 def _sse(event: str, data: dict) -> str:
+    """Format one Server-Sent Event message: a labeled chunk the browser can read as it arrives."""
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
@@ -40,7 +42,7 @@ def chat_stream(message: str) -> StreamingResponse:
     event loop for other requests."""
 
     def events():
-        for entry in run_agent_stream(get_llm(), message):
+        for entry in run_agent_stream(get_llm(), message):  # yields one step at a time, live
             yield _sse(
                 "step",
                 {
@@ -50,9 +52,10 @@ def chat_stream(message: str) -> StreamingResponse:
                     "chart": entry.chart,
                 },
             )
-        yield _sse("done", {})
+        yield _sse("done", {})  # tell the browser the conversation turn is complete
 
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
+# Serve the frontend (index.html, app.js, style.css) for every other URL.
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

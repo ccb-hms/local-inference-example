@@ -15,6 +15,7 @@
   --observation-accent: #3f9d5f;
   --error-bg: #fdeceb;
   --code-bg: #f7f7f8;
+  --code-comment: #adadad;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +36,7 @@
     --observation-accent: #5fbf82;
     --error-bg: #402b2a;
     --code-bg: #17181a;
+    --code-comment: #6e6e6e;
   }
 }
 
@@ -287,4 +289,12 @@ body {
   font-size: 0.8rem;
   white-space: pre;
   background: transparent !important;
+}
+
+/* Comments render in a distinctly lighter gray than the code around them, so they
+   read as asides, not as code - overrides the highlight.js theme's own comment
+   color, which is close in shade to normal code and doesn't stand out enough. */
+.detail-body .hljs-comment {
+  color: var(--code-comment) !important;
+  font-style: italic;
 }
