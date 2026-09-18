@@ -12,9 +12,14 @@ from .agent import AgentStep
 # (see AgentStep) guarantees valid *syntax* regardless of model size, but
 # smaller models are noticeably less reliable at choosing the right tool -
 # Qwen2.5-0.5B-Instruct, for example, frequently loops on get_time instead of
-# giving a final_answer. 1.5B is close to the sweet spot for this demo; try
-# dropping to Qwen/Qwen2.5-0.5B-Instruct to show that failure mode live.
-DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+# giving a final_answer. 1.5B is close to the sweet spot for this demo; pass
+# --model-size 0.5b (see cli.py) to show that failure mode live.
+MODEL_SIZES = {
+    "1.5b": "Qwen/Qwen2.5-1.5B-Instruct",
+    "0.5b": "Qwen/Qwen2.5-0.5B-Instruct",
+}
+DEFAULT_MODEL_SIZE = "1.5b"
+DEFAULT_MODEL = MODEL_SIZES[DEFAULT_MODEL_SIZE]
 
 
 def pick_device() -> str:
