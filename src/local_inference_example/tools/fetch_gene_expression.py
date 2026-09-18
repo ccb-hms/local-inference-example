@@ -24,14 +24,15 @@ GTEX_API = "https://gtexportal.org/api/v2"
 def get_dataframe(gene: str) -> tuple[str, pd.DataFrame, str]:
     """Return (canonical_symbol, dataframe, api_url) for a gene, resolving
     it first."""
-    gencode_id, canonical_symbol, _resolve_url, _record = get_gencode_id(gene)
-    resp = httpx.get(
+    gencode_id, canonical_symbol, _resolve_url, _record = get_gencode_id(gene)  # look up ID first
+    resp = httpx.get(  # ask GTEx for this gene's expression measurements
         f"{GTEX_API}/expression/geneExpression",
         params={"gencodeId": gencode_id, "datasetId": DATASET_ID, "itemsPerPage": 100},
-        timeout=30,
+        timeout=30,  # give up after 30 seconds if GTEx doesn't respond
     )
-    resp.raise_for_status()
-    entries = resp.json()["data"]
+    resp.raise_for_status()  # stop here with an error if the request failed
+    entries = resp.json()["data"]  # one entry per tissue, each holding many sample values
+    # Flatten "one entry per tissue, many values each" into one table row per sample.
     df = pd.DataFrame(
         {"tissue": entry["tissueSiteDetailId"], "tpm": value}
         for entry in entries
@@ -45,14 +46,16 @@ def fetch_gene_expression(gene: str) -> ToolResult:
     tissues (resolving the gene symbol first). Pure data acquisition -
     pair with summarize_expression or plot_gene_expression to do something
     with what comes back."""
+    # Step 1: fetch the data, handling the two ways this can fail.
     try:
         canonical_symbol, df, api_url = get_dataframe(gene)
     except GeneNotFoundError as exc:
-        return ToolResult(text=f"error: {exc}")
+        return ToolResult(text=f"error: {exc}")  # gene name wasn't recognized
     except httpx.HTTPError as exc:
-        return ToolResult(text=f"error: could not reach GTEx ({exc})")
+        return ToolResult(text=f"error: could not reach GTEx ({exc})")  # network/API problem
 
-    preview_rows = 10
+    # Step 2: summarize what we got and package it for the chat UI.
+    preview_rows = 10  # only show a handful of rows in the inspector, not all of them
     return ToolResult(
         text=(
             f"Fetched {len(df)} real per-sample TPM values for {canonical_symbol} "
@@ -62,7 +65,7 @@ def fetch_gene_expression(gene: str) -> ToolResult:
         raw_data={
             "total_samples": len(df),
             "tissue_count": int(df["tissue"].nunique()),
-            "preview": df.head(preview_rows).to_dict(orient="records"),
+            "preview": df.head(preview_rows).to_dict(orient="records"),  # first few rows only
             "preview_note": f"showing {preview_rows} of {len(df)} rows",
         },
     )

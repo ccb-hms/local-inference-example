@@ -21,18 +21,23 @@ def summarize_expression(gene: str) -> ToolResult:
     """Summarize where a gene is most highly expressed across GTEx tissues
     and how tissue-specific it is, in plain numbers (fetching the data
     itself)."""
+    # Step 1: fetch the data, handling the two ways this can fail.
     try:
         canonical_symbol, df, api_url = get_dataframe(gene)
     except GeneNotFoundError as exc:
-        return ToolResult(text=f"error: {exc}")
+        return ToolResult(text=f"error: {exc}")  # gene name wasn't recognized
     except httpx.HTTPError as exc:
-        return ToolResult(text=f"error: could not reach GTEx ({exc})")
+        return ToolResult(text=f"error: could not reach GTEx ({exc})")  # network/API problem
 
+    # Step 2: for each tissue, find its typical (median) expression level, then rank
+    # tissues from highest to lowest.
     medians = df.groupby("tissue")["tpm"].median().sort_values(ascending=False)
-    top_tissue, top_median = medians.index[0], medians.iloc[0]
-    overall_median = medians.median()
+    top_tissue, top_median = medians.index[0], medians.iloc[0]  # the single highest tissue
+    overall_median = medians.median()  # a "typical" level across all tissues, for comparison
+    # Step 3: how many times higher the top tissue is vs. the typical tissue.
     specificity = (top_median + PSEUDOCOUNT) / (overall_median + PSEUDOCOUNT)
 
+    # Step 4: turn the numbers into a plain-English sentence and package the result.
     text = (
         f"{canonical_symbol}: highest median expression in {top_tissue} "
         f"({top_median:.2f} TPM), {specificity:.1f}x the median across all "
