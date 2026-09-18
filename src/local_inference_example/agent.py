@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 
 from .tools import TOOLS, ToolResult
 
-MAX_STEPS = 7
+MAX_STEPS = 7  # give up after this many tool calls, so a confused model can't loop forever
 SKILLS_DIR = Path(__file__).parent / "skills"
 
 
@@ -28,9 +28,9 @@ def _load_skill(path: Path) -> dict[str, str]:
     """Parse a skills/*.md file's `key: value` frontmatter (between the
     `---` markers) into a dict. The prose below the frontmatter is for
     humans reading the repo; only the frontmatter feeds the prompt."""
-    _, frontmatter, _ = path.read_text().split("---", 2)
+    _, frontmatter, _ = path.read_text().split("---", 2)  # text between the two "---" lines
     fields = {}
-    for line in frontmatter.strip().splitlines():
+    for line in frontmatter.strip().splitlines():  # one "key: value" pair per line
         key, _, value = line.partition(":")
         fields[key.strip()] = value.strip()
     return fields
@@ -40,10 +40,13 @@ def _build_tool_list() -> str:
     """One bullet per skills/*.md file, in the exact wording that file
     declares - editing a skill file changes what the model is told, with no
     Python change required."""
-    skills = [_load_skill(path) for path in sorted(SKILLS_DIR.glob("*.md"))]
+    skills = [_load_skill(path) for path in sorted(SKILLS_DIR.glob("*.md"))]  # one file per tool
     return "\n".join(f"- {s['tool']}: {s['description']}, e.g. {s['call']}" for s in skills)
 
 
+# Each of these classes describes the exact shape of one kind of tool call the model can
+# make - which fields it needs and what values are allowed. The model's output is checked
+# against these shapes, so it can't send a call that's missing a field or has a typo'd name.
 class ResolveGeneCall(BaseModel):
     tool: Literal["resolve_gene"]
     gene: str = Field(max_length=20, description="A gene symbol, e.g. 'BRCA1'")
@@ -95,6 +98,8 @@ class GetTimeCall(BaseModel):
 
 
 class FinalAnswer(BaseModel):
+    """Not a tool call - this is how the model signals "I'm done, here's the answer"."""
+
     tool: Literal["final_answer"]
     answer: str = Field(max_length=300)
 
@@ -105,6 +110,9 @@ ToolCall = Union[
 
 
 class AgentStep(BaseModel):
+    """Exactly one of the shapes above - whatever the model decides to do next.
+    `discriminator="tool"` tells it to pick the shape by looking at the "tool" field."""
+
     step: Union[
         ResolveGeneCall,
         FetchGeneCall,
@@ -188,6 +196,9 @@ FEW_SHOT_EXAMPLES: list[dict[str, str]] = [
 
 
 class ChatModel(Protocol):
+    """Anything with a generate_step method can drive the agent loop - lets tests
+    swap in a fake model instead of loading the real (slow) one."""
+
     def generate_step(self, messages: list[dict[str, str]]) -> AgentStep: ...
 
 
@@ -205,6 +216,7 @@ class TranscriptEntry:
 
 
 def _describe_call(step: ToolCall) -> str:
+    """A one-line, plain-English caption for whichever tool call the model just made."""
     if isinstance(step, ResolveGeneCall):
         return f"Calling resolve_gene(gene='{step.gene}') - looking up its GENCODE ID..."
     if isinstance(step, FetchGeneCall):
@@ -224,7 +236,7 @@ def _call_detail(step: Union[ToolCall, FinalAnswer]) -> dict:
     if isinstance(step, FinalAnswer):
         return {"type": "json", "language": "json", "content": step.model_dump_json(indent=2)}
     try:
-        content = inspect.getsource(TOOLS[step.tool])
+        content = inspect.getsource(TOOLS[step.tool])  # read the tool function's own source code
     except (OSError, TypeError, KeyError):
         content = "# source unavailable"
     return {"type": "code", "language": "python", "content": content}
@@ -233,11 +245,11 @@ def _call_detail(step: Union[ToolCall, FinalAnswer]) -> dict:
 def _api_detail(api_url: str) -> dict:
     """The request that actually ran, broken into method/endpoint/params
     instead of one long query string."""
-    parts = urlsplit(api_url)
+    parts = urlsplit(api_url)  # break the URL into scheme/host/path/query pieces
     payload = {
         "method": "GET",
         "endpoint": f"{parts.scheme}://{parts.netloc}{parts.path}",
-        "params": dict(parse_qsl(parts.query)),
+        "params": dict(parse_qsl(parts.query)),  # the "?key=value&..." part, as a dict
     }
     return {"type": "api", "language": "json", "content": json.dumps(payload, indent=2)}
 
@@ -257,6 +269,8 @@ def _data_detail(result: ToolResult) -> dict | None:
 def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
     """Run the tool-call loop, yielding each TranscriptEntry the instant
     it's produced - the real basis for "live" narration."""
+    # The running back-and-forth "conversation" fed to the model each turn: the
+    # instructions, a few worked examples, then the user's real question.
     messages: list[dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *FEW_SHOT_EXAMPLES,
@@ -265,16 +279,16 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
     last_call: str | None = None
     last_result: ToolResult | None = None
 
-    for step_num in range(max_steps):
+    for step_num in range(max_steps):  # keep asking the model "what next?" up to max_steps times
         yield TranscriptEntry(
             "thinking",
             "Reading your question..." if step_num == 0 else "Deciding what to do next...",
         )
-        agent_step = llm.generate_step(messages)
+        agent_step = llm.generate_step(messages)  # ask the model to decide its next step
         step = agent_step.step
-        messages.append({"role": "assistant", "content": step.model_dump_json()})
+        messages.append({"role": "assistant", "content": step.model_dump_json()})  # remember its choice
 
-        if isinstance(step, FinalAnswer):
+        if isinstance(step, FinalAnswer):  # the model says it's done
             yield TranscriptEntry(
                 "action", "Calling final_answer(...) - wrapping up...", _call_detail(step)
             )
@@ -292,9 +306,9 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
             return
         last_call = call
 
-        tool = TOOLS[step.tool]
-        last_result = tool(**step.model_dump(exclude={"tool"}))
-        if last_result.api_url:
+        tool = TOOLS[step.tool]  # look up the actual Python function for this tool name
+        last_result = tool(**step.model_dump(exclude={"tool"}))  # run it with the chosen arguments
+        if last_result.api_url:  # show the real web request this tool made, if any
             yield TranscriptEntry(
                 "api_call", last_result.api_url, _api_detail(last_result.api_url)
             )
@@ -304,8 +318,10 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
             _data_detail(last_result),
             chart=last_result.chart,
         )
+        # Feed the result back in, so the model's next decision accounts for what just happened.
         messages.append({"role": "user", "content": f"Observation: {last_result.text}"})
 
+    # Ran out of steps without the model reaching a final answer - report the last thing we know.
     yield TranscriptEntry(
         "final",
         f"(gave up after {max_steps} steps; last observation: "
