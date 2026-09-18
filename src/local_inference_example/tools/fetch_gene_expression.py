@@ -24,8 +24,11 @@ GTEX_API = "https://gtexportal.org/api/v2"
 def get_dataframe(gene: str) -> tuple[str, pd.DataFrame, str]:
     """Return (canonical_symbol, dataframe, api_url) for a gene, resolving
     it first."""
-    gencode_id, canonical_symbol, _resolve_url, _record = get_gencode_id(gene)  # look up ID first
-    resp = httpx.get(  # ask GTEx for this gene's expression measurements
+    # Step 1: resolve the gene symbol to the stable GENCODE ID GTEx expects.
+    gencode_id, canonical_symbol, _resolve_url, _record = get_gencode_id(gene)
+
+    # Step 2: fetch this gene's expression measurements using that ID.
+    resp = httpx.get(
         f"{GTEX_API}/expression/geneExpression",
         params={"gencodeId": gencode_id, "datasetId": DATASET_ID, "itemsPerPage": 100},
         timeout=30,  # give up after 30 seconds if GTEx doesn't respond
