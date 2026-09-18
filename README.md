@@ -1,22 +1,22 @@
 # Local Inference Example
 
-A hands-on demo: download a small open-weight model from Hugging Face,
-run it entirely on your own laptop, and wrap it in a minimal tool-using
-("agentic") loop that calls a real public bioinformatics API, with a
-browser UI so you can watch it work.
+This is a hands-on demo that downloads a small open-weight model from
+Hugging Face, runs it entirely on your own laptop, and wraps it in a
+minimal tool-using ("agentic") loop that calls a real public
+bioinformatics API, with a browser UI so you can watch it work.
 
-Running the model locally instead of through a hosted API buys you:
+Running the model locally instead of calling a hosted API has a few
+practical advantages here. After the first download the model itself
+needs no internet connection, so it keeps working offline (only the
+tools' calls to the public GTEx API need a connection). Your prompts and
+the model's reasoning stay on your laptop, so there's no API key and no
+request log sitting on someone else's server. Because the weights are
+open, you can actually inspect every prompt, step, and tool call the
+model produces, rather than treating it as a black box. And because
+nothing here depends on a vendor's API, you can swap the model, edit a
+tool's schema, or change the prompt directly.
 
-- **Offline-capable.** After the first download, the model itself needs
-  no internet; only the tools' calls to the public GTEx API do.
-- **Private.** Your prompts and the model's reasoning never leave your
-  laptop; no API key, no request logs on someone else's server.
-- **Observable.** The weights are open, so every step, prompt, and tool
-  call in this repo is something you can actually inspect and modify.
-- **Customizable.** Swap the model, edit a tool's schema, or change the
-  prompt directly, no vendor API to work around.
-
-Works on macOS and Windows/Linux, CPU-only by default.
+It works on macOS and Windows/Linux, and runs on CPU only by default.
 
 ## Quickstart
 
@@ -38,9 +38,10 @@ internet, since the tools query GTEx live.
 
 ## What it does
 
-A chat panel on the left, a chart panel on the right. Ask about a gene (e.g.
-*"where is BRCA1 expressed?"*) and the model, running entirely on your
-laptop, decides which tools to call, in what order, to answer you. Every
+There's a chat panel on the left and a chart panel on the right. Ask about
+a gene (e.g. *"where is BRCA1 expressed?"*) and the model, running
+entirely on your laptop, decides which tools to call, in what order, to
+answer you. Every
 tool call and its result is narrated into the chat *as it actually
 happens*, over a real streaming connection: you're watching the agent loop
 run live, token by token.
@@ -140,8 +141,8 @@ Every JSON object the model emits is additionally constrained by
 [agent.py](src/local_inference_example/agent.py)), so it's guaranteed to
 be a syntactically well-formed tool call or final answer, no regex-parsing
 of free-form text required. It can still pick the *wrong* tool, or waste a
-step on `get_time`; the schema only guarantees the call is syntactically
-valid, it says nothing about whether calling it was the right call.
+step on `get_time`. The schema only guarantees the call is syntactically
+valid; it says nothing about whether calling it was the right call.
 
 ## Swapping in a different model
 
@@ -177,32 +178,34 @@ server.
 
 A few things worth calling out live:
 
-- **Constrained decoding vs. model judgment.** The `AgentStep` schema
-  guarantees the model's output always parses as valid JSON. It does not
-  guarantee the model calls the tools in a sensible order, or stops once it
-  has enough information; see [agent.py](src/local_inference_example/agent.py)'s
-  stall-detection fallback, which exists because even Qwen2.5-1.5B
-  occasionally re-issues the same tool call instead of answering.
-- **Step limits are a real safety mechanism.** `MAX_STEPS`
-  in [agent.py](src/local_inference_example/agent.py) caps how many tool
-  calls one query can trigger; without it, a confused small model can loop
-  indefinitely. Splitting one tool into four raises the minimum number of
-  steps a correct answer needs, so `MAX_STEPS` had to grow with it.
-- **The model never sees your data go anywhere except GTEx.** The LLM runs
-  entirely on your machine; the only network calls are the tools' requests
-  to the public GTEx API, and they only ever send a gene symbol: no
-  personal data, no query text.
-- **Check the model's commentary against the tool result it describes.**
-  The gene symbol, tissue names, and TPM values in each Observation come
-  straight from GTEx. But ask it to "pick a gene associated with
-  Alzheimer's" and it may confidently name one that isn't correct: there's
-  no search-by-disease tool, so that step is unconstrained model guesswork.
-  The schema only constrains the *shape* of every tool call. It says
-  nothing about the *judgment* behind picking `gene='ALDH7A1'` over the
-  real Alzheimer's genes (`APOE`, `APP`, `PSEN1`/`PSEN2`, `TREM2`). Worth
-  pairing every number the model reports with the chart instead of trusting
-  its prose alone, and worth asking a workshop audience which parts of an
-  answer they'd trust and which they'd check.
+- The `AgentStep` schema guarantees the model's output always parses as
+  valid JSON, but it doesn't guarantee the model calls the tools in a
+  sensible order or stops once it has enough information. See
+  [agent.py](src/local_inference_example/agent.py)'s stall-detection
+  fallback, which exists because even Qwen2.5-1.5B occasionally re-issues
+  the same tool call instead of answering. This is the difference between
+  constraining a model's syntax and constraining its judgment.
+- `MAX_STEPS` in [agent.py](src/local_inference_example/agent.py) caps how
+  many tool calls one query can trigger, and it's a real safety mechanism:
+  without it, a confused small model can loop indefinitely. Splitting one
+  tool into four raised the minimum number of steps a correct answer
+  needs, so `MAX_STEPS` had to grow along with it.
+- The LLM runs entirely on your machine, and the only network calls it
+  triggers are the tools' requests to the public GTEx API. Those requests
+  only ever carry a gene symbol; no personal data and no query text leave
+  your laptop.
+- The gene symbol, tissue names, and TPM values in each Observation come
+  straight from GTEx, but it's worth checking the model's own commentary
+  against that data rather than taking it at face value. Ask it to "pick
+  a gene associated with Alzheimer's" and it may confidently name one
+  that isn't correct, because there's no search-by-disease tool and that
+  step is unconstrained model guesswork. The schema only constrains the
+  shape of a tool call; it says nothing about the judgment behind picking
+  `gene='ALDH7A1'` over the real Alzheimer's genes (`APOE`, `APP`,
+  `PSEN1`/`PSEN2`, `TREM2`). It's worth pairing every number the model
+  reports with the chart instead of trusting its prose alone, and worth
+  asking a workshop audience which parts of an answer they'd trust and
+  which they'd check.
 
 ## Why not just use the model's native tool-calling format?
 
@@ -217,18 +220,18 @@ tools need." Nothing about the chat template stops it from naming a tool
 that doesn't exist, dropping a required argument, or emitting a tissue
 name that isn't a real GTEx tissue. That gap is what you have to close.
 
-One way to close it: parse the JSON, then validate it against the same
+One way to close it is to parse the JSON, validate it against the same
 pydantic `AgentStep` schema, and retry (feeding the error back to the
 model) whenever it fails. That works, but every retry is a full extra
 generation: each failure costs real latency, and you're still only
 lowering the failure probability rather than eliminating it.
 
-The other way, and what `model.py` actually does: constrain decoding
-itself with [outlines](https://github.com/dottxt-ai/outlines), which
-compiles the `AgentStep` schema into a finite-state machine and restricts
-which *tokens* the model is allowed to sample at each step. The output
-can't help but be schema-valid: there's no invalid JSON to catch, and
-therefore nothing to retry.
+`model.py` takes the other approach and constrains decoding itself, using
+[outlines](https://github.com/dottxt-ai/outlines) to compile the
+`AgentStep` schema into a finite-state machine that restricts which
+*tokens* the model is allowed to sample at each step. The output can't
+help but be schema-valid, so there's no invalid JSON to catch and nothing
+to retry.
 
 We measured the actual difference (`scripts/compare_failure_rates.py`):
 how often raw output validates against `AgentStep` on the *first try*, no
@@ -251,12 +254,12 @@ of model size.
 That specific 0.5B failure turned out to be promptable away: adding one
 sentence to the system prompt ("every tool call must include an
 `arguments` object, even for a tool with no parameters") took native's
-0.5B score from 24/32 back to 32/32. Which is the real tradeoff:
-validate-and-retry *can* get you the same reliability, but only after
-you've discovered the failure mode empirically (by shipping it, or by
-running exactly this kind of eval) and patched the prompt for it, and
+0.5B score from 24/32 back to 32/32. That's the real tradeoff.
+Validate-and-retry *can* get you the same reliability, but only after
+you've discovered the failure mode empirically, by shipping it or by
+running exactly this kind of eval, and patched the prompt for it, and
 you're still paying for retries on whatever failure mode you *haven't*
 found yet. Outlines rules the whole category out by construction, before
-you've written a single test case. That's what "guarantees valid syntax
-regardless of model size" (see the note above `DEFAULT_MODEL` in
+you've even written a single test case. That's what "guarantees valid
+syntax regardless of model size" (see the note above `DEFAULT_MODEL` in
 [model.py](src/local_inference_example/model.py)) is actually buying you.
