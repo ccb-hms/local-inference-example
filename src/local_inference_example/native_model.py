@@ -1,10 +1,23 @@
-"""Prototype: use the model's *native* tool-calling chat template (Qwen's
-Hermes-style <tool_call> format) instead of outlines' constrained decoding,
-then validate the free-generated JSON against the same AgentStep schema.
+"""The obvious starting point for tool use: Qwen's own Hermes-style
+<tool_call> chat template. Pass tools= to apply_chat_template and the model
+free-generates a JSON block - {"name": ..., "arguments": {...}} - which we
+then parse and validate against the AgentStep schema with pydantic.
 
-This exists to measure how often the "native format + pydantic validation"
-approach fails compared to outlines' grammar-constrained approach in
-model.py - see scripts/compare_failure_rates.py.
+"The model outputs JSON" is not the same guarantee as "the model outputs
+JSON matching our schema": nothing about the chat template stops it from
+naming a tool that doesn't exist, dropping a required argument, or
+truncating mid-object. Pydantic validation catches that after the fact,
+but by then the malformed output already happened - the only fix is to
+retry (see NativeLLM.generate_step below), which costs another full
+generation every time it happens and still isn't a guarantee, just a
+lower failure probability.
+
+model.py's outlines-based approach exists to close that gap: constrained
+decoding uses a finite-state machine derived from the schema to restrict
+which tokens can be sampled at each step, so the output can't help but be
+schema-valid - no parsing, no retries, no failure mode to catch. This
+module exists to measure, empirically, how much that buys you - see
+scripts/compare_failure_rates.py.
 """
 
 from __future__ import annotations
