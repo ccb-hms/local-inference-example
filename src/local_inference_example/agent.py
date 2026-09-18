@@ -130,6 +130,13 @@ tool call or your final answer.
 Available tools:
 {_build_tool_list()}
 
+These tools only accept a gene symbol (e.g. "BRCA1"), not a disease, protein, \
+or condition name. If the user names a disease or condition instead of a gene \
+symbol, use your own knowledge to pick a well-known gene associated with it \
+(e.g. Alzheimer's disease -> APOE) and look that gene up instead of the \
+disease name itself. If a gene lookup still fails, don't keep retrying the \
+same or a similar bad input - give a final_answer explaining what wasn't found.
+
 Once you know the answer, respond with: {{"tool": "final_answer", "answer": "..."}}
 
 Respond with exactly one JSON object and nothing else.
@@ -177,6 +184,56 @@ FEW_SHOT_EXAMPLES: list[dict[str, str]] = [
             '{"tool": "final_answer", "answer": "BRCA1 is most highly expressed in '
             'EBV-transformed lymphocytes, about 15.5x the median across all 54 GTEx '
             'tissues - see the chart"}'
+        ),
+    },
+    {"role": "user", "content": "What gene is linked to Alzheimer's disease?"},
+    {"role": "assistant", "content": '{"tool": "resolve_gene", "gene": "APOE"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: Resolved 'APOE' to GENCODE ID ENSG00000130203.10 "
+            "(canonical symbol: APOE)."
+        ),
+    },
+    {"role": "assistant", "content": '{"tool": "summarize_expression", "gene": "APOE"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: APOE: highest median expression in Liver (2153.9 TPM), "
+            "36.2x the median across all 54 tissues."
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            '{"tool": "final_answer", "answer": "APOE is the gene most strongly '
+            'linked to Alzheimer\'s disease. It is most highly expressed in the '
+            'liver, about 36.2x the median across all 54 GTEx tissues"}'
+        ),
+    },
+    {"role": "user", "content": "what tissues is the parkinsons gene expressed in?"},
+    {"role": "assistant", "content": '{"tool": "resolve_gene", "gene": "SNCA"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: Resolved 'SNCA' to GENCODE ID ENSG00000145335.15 "
+            "(canonical symbol: SNCA)."
+        ),
+    },
+    {"role": "assistant", "content": '{"tool": "summarize_expression", "gene": "SNCA"}'},
+    {
+        "role": "user",
+        "content": (
+            "Observation: SNCA: highest median expression in Brain_Putamen_basal_ganglia "
+            "(451.2 TPM), 8.1x the median across all 54 tissues."
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            '{"tool": "final_answer", "answer": "The gene most strongly linked to '
+            'Parkinson\'s disease is SNCA. It is most highly expressed in the brain\'s '
+            'putamen (basal ganglia), about 8.1x the median across all 54 GTEx tissues"}'
         ),
     },
     {"role": "user", "content": "How about the gene FOOBARBAZ?"},
@@ -278,6 +335,7 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
     ]
     last_call: str | None = None
     last_result: ToolResult | None = None
+    consecutive_errors = 0
 
     for step_num in range(max_steps):  # keep asking the model "what next?" up to max_steps times
         yield TranscriptEntry(
@@ -318,6 +376,20 @@ def run_agent_stream(llm: ChatModel, query: str, max_steps: int = MAX_STEPS):
             _data_detail(last_result),
             chart=last_result.chart,
         )
+
+        # A small model can also get stuck alternating between *different*
+        # tool calls (e.g. resolve_gene, then summarize_expression) that all
+        # fail on the same bad input, without ever repeating one exactly. Cap
+        # consecutive tool errors too, not just identical calls, so it can't
+        # burn the whole step budget on a name that was never a gene.
+        if last_result.text.startswith("error:"):
+            consecutive_errors += 1
+            if consecutive_errors >= 2:
+                yield TranscriptEntry("final", last_result.text)
+                return
+        else:
+            consecutive_errors = 0
+
         # Feed the result back in, so the model's next decision accounts for what just happened.
         messages.append({"role": "user", "content": f"Observation: {last_result.text}"})
 
