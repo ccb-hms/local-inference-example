@@ -132,13 +132,17 @@ step on `get_time` - the schema guarantees syntax, not judgment.
 
 ## Swapping in a different model
 
-Change `DEFAULT_MODEL` in [model.py](src/local_inference_example/model.py) to
-any small instruct model on the Hugging Face Hub. Worth trying live in a
-workshop: dropping to `Qwen/Qwen2.5-0.5B-Instruct` (~1GB) still produces
-syntactically valid tool calls (that's what the JSON schema constraint
-guarantees), but noticeably more often skips a step or loops instead of
-giving a final answer - a good illustration of the difference between
-constraining a model's *syntax* versus its *judgment*.
+```bash
+uv run local-inference-example --model-size 0.5b   # ~1GB, faster, less reliable
+uv run local-inference-example --model-size 1.5b    # default
+```
+
+`Qwen/Qwen2.5-0.5B-Instruct` still produces syntactically valid tool calls
+(that's what the JSON schema constraint guarantees), but noticeably more
+often skips a step or loops instead of giving a final answer - a good
+illustration of the difference between constraining a model's *syntax*
+versus its *judgment*. For any other model, change `MODEL_SIZES` in
+[model.py](src/local_inference_example/model.py).
 
 ## Workshop notes
 
@@ -176,3 +180,43 @@ A few things worth calling out live:
   pairing every number the model reports with the chart, not just its
   prose - and worth asking a workshop audience which parts of an answer
   they'd trust and which they'd check.
+
+## Why outlines, and not the model's native tool-calling format?
+
+Qwen2.5-Instruct ships its own tool-calling convention: pass `tools=` to
+`tokenizer.apply_chat_template`, and the model free-generates a
+`<tool_call>{"name": ..., "arguments": {...}}</tool_call>` block that you
+parse yourself. That's a real alternative to outlines' constrained
+decoding, so it's worth asking whether outlines is pulling its weight -
+"native format, then validate with pydantic" is simpler and needs one
+fewer dependency.
+
+We prototyped it (`src/local_inference_example/native_model.py`) and
+measured how often raw output validated against the same `AgentStep`
+schema on the *first try*, no retries, 8 samples per query
+(`scripts/compare_failure_rates.py`):
+
+| Model | outlines (constrained) | native `<tool_call>` + pydantic |
+|---|---|---|
+| Qwen2.5-1.5B-Instruct (default) | 32/32 (100%) | 32/32 (100%) |
+| Qwen2.5-0.5B-Instruct | 32/32 (100%) | 24/32 (75%) |
+
+At the default 1.5B size, both approaches were equally reliable - outlines
+isn't buying anything on raw JSON-conformance there. At 0.5B, every native
+failure was the same shape: for a zero-argument tool (`get_time`), the
+model emitted `{"name": "get_time"}` and omitted the required `"arguments"`
+key entirely, which the Hermes tool-calling spec (and our validator)
+requires as `"arguments": {}`. Outlines can't produce that failure - the
+grammar makes an empty-but-present `arguments` object structurally
+unavoidable, regardless of model size.
+
+That specific 0.5B failure turned out to be promptable away: adding one
+sentence to the system prompt ("every tool call must include an
+`arguments` object, even for a tool with no parameters") took native's
+0.5B score from 24/32 back to 32/32. Which is the actual tradeoff: native
++ pydantic validation *can* match outlines, but only after you've
+discovered the failure mode empirically and patched the prompt for it.
+Outlines rules the whole category out by construction, before you've
+written a single test case - that's what "guarantees valid syntax
+regardless of model size" (see the note above `DEFAULT_MODEL` in
+[model.py](src/local_inference_example/model.py)) is actually buying you.

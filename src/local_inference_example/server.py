@@ -12,18 +12,19 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent import run_agent_stream
-from .model import LocalLLM
+from .model import DEFAULT_MODEL, LocalLLM
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="local-inference-example")
 _llm: LocalLLM | None = None
+model_name = DEFAULT_MODEL
 
 
 def get_llm() -> LocalLLM:
     global _llm
     if _llm is None:
-        _llm = LocalLLM()
+        _llm = LocalLLM(model_name=model_name)
     return _llm
 
 
