@@ -109,10 +109,18 @@ const slideEls = document.querySelectorAll(".slide");
 const progress = document.getElementById("progress");
 let current = 0;
 
-function show(index) {
+function slideFromHash() {
+  const n = parseInt(location.hash.slice(1), 10);
+  return Number.isInteger(n) ? n - 1 : 0;
+}
+
+function show(index, { updateHash = true } = {}) {
   current = Math.max(0, Math.min(slideEls.length - 1, index));
   slideEls.forEach((slide, i) => slide.classList.toggle("active", i === current));
   progress.textContent = `${current + 1} / ${slideEls.length}`;
+  if (updateHash) {
+    history.replaceState(null, "", `#${current + 1}`);
+  }
 }
 
 document.getElementById("prev").addEventListener("click", () => show(current - 1));
@@ -123,4 +131,6 @@ window.addEventListener("keydown", (event) => {
   if (["ArrowLeft", "PageUp"].includes(event.key)) show(current - 1);
 });
 
-show(0);
+window.addEventListener("hashchange", () => show(slideFromHash(), { updateHash: false }));
+
+show(slideFromHash());
