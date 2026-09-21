@@ -128,8 +128,9 @@ body {
 }
 
 .chip {
-  display: inline;
-  margin-left: 0.6rem;
+  display: block;
+  width: fit-content;
+  margin-top: 0.4rem;
   white-space: nowrap;
   padding: 0.15rem 0.65rem;
   border-radius: 999px;
