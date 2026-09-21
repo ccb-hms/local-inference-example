@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APIs and Local Inference</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="deck">
+    <section class="slide" data-title="Title">
+      <h1>APIs and Local Inference</h1>
+      <p class="byline">Jane Adams</p>
+    </section>
+
+    <section class="slide" data-title="Motivation">
+      <h2>Motivation: API vs Chatbot/GUI</h2>
+      <ul>
+        <li>Programmatic access: inference on large data sets</li>
+        <li>Hyperparameter control (temp, top_p, num_completions, &hellip;)</li>
+        <li>Structured outputs (e.g. for zero-shot text classification)</li>
+        <li>Reproducibility, model versions, checkpoints</li>
+        <li>Performance guarantees</li>
+        <li>Security, privacy, compliance</li>
+        <li>Cost control</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Local inference">
+      <h2>Local inference</h2>
+      <ul>
+        <li>What's an API</li>
+        <li>When do I need one</li>
+        <li>Examples: OpenAI, Azure OpenAI, Anthropic, Ollama, vLLM</li>
+        <li>Local inference places: your laptop, HMS HPC clusters (O2), CCB servers</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Model serving software">
+      <h2>Model Serving Software</h2>
+      <ul>
+        <li>Ollama, vLLM</li>
+        <li>"Bare metal" vs. container</li>
+        <li>Setting up a model server: on your laptop, at HMS on the HPC cluster, in the cloud</li>
+        <li><a href="https://github.com/ccb-hms/LLMTools-HMS">github.com/ccb-hms/LLMTools-HMS</a></li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Inference stack architecture">
+      <h2>Architecture of an AI Inference Stack</h2>
+      <ul>
+        <li>Hardware (GPU, CPU); ARM vs Intel</li>
+        <li>OS loads device driver</li>
+        <li>SDKs on top of drivers (CUDA, cuDNN, TensorRT, &hellip;); bare metal vs containers</li>
+        <li>Frameworks on top of SDKs (transformers, etc.)</li>
+        <li>Open weight model</li>
+        <li>Model serving software</li>
+        <li>API</li>
+        <li>Client</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Containers">
+      <h2>Containers</h2>
+      <ul>
+        <li>Docker</li>
+        <li>Nvidia</li>
+        <li>GitHub</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="The forward pass">
+      <h2>A Deeper Look at the Forward Pass (Inference)</h2>
+      <ul>
+        <li>Model weights loaded: disk &rarr; RAM &rarr; HBM</li>
+        <li>The forward pass with attention</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="GPU requirements">
+      <h2>GPU Requirements</h2>
+      <ul>
+        <li>HBM is generally the limiting factor</li>
+        <li>Multiple coprocessors can work together, NVLINK</li>
+        <li>Can offload weights to system memory, with varying performance depending on platform</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Context window">
+      <h2>Implications of Context Window Size</h2>
+      <ul>
+        <li>Bigger window &rarr; more information attended to at inference time</li>
+        <li>Bigger window needs more HBM / RAM</li>
+        <li>Common max context window sizes, and real world interpretation (e.g. what can I fit in 128k tokens?)</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="Hardware guidance">
+      <h2>Guidance for Local Hardware</h2>
+      <ul>
+        <li>What types of problems can we solve on various hardware</li>
+        <li>Intel / ARM servers with NVIDIA GPUs: DGX, Dell, Grace Hopper / Blackwell</li>
+        <li>Desktop workstations: Intel with NVIDIA GPUs, NVIDIA ARM, Apple Silicon (Mac Studio)</li>
+      </ul>
+    </section>
+
+    <section class="slide" data-title="HMS hardware options">
+      <h2>Hardware Options at HMS (O2, Longwood)</h2>
+    </section>
+
+    <section class="slide" data-title="Next steps">
+      <h2>Resources for your next steps</h2>
+      <ul>
+        <li>Git repos maintained by CCB</li>
+        <li>NVIDIA registry</li>
+        <li>Reading material for a deeper dive: research papers, "Build a LLM from Scratch", etc.</li>
+        <li>Helpful blog posts, etc.</li>
+      </ul>
+    </section>
+  </div>
+
+  <div id="controls">
+    <button id="prev" aria-label="Previous slide">&larr;</button>
+    <span id="progress"></span>
+    <button id="next" aria-label="Next slide">&rarr;</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1a1a1a;
+  --bg: #ffffff;
+  --muted: #666;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #f0f0f0;
+    --bg: #1a1a1a;
+    --muted: #aaa;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+#deck {
+  position: relative;
+  height: 100vh;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem 6rem;
+  overflow-y: auto;
+}
+
+.slide.active {
+  display: flex;
+}
+
+.slide h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.slide h2 {
+  font-size: 2.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.slide .byline {
+  color: var(--muted);
+  font-size: 1.25rem;
+}
+
+.slide ul {
+  font-size: 1.4rem;
+  line-height: 1.6;
+}
+
+#controls {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+#controls button {
+  font-size: 1.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+#progress {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
