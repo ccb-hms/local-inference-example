@@ -11,6 +11,7 @@
     <section class="slide" data-title="Title">
       <h1>APIs and Local Inference</h1>
       <p class="byline">Jane Adams</p>
+      <p class="attribution">Adapted from a talk by Andreas Werdich and Nathan Palmer</p>
     </section>
 
     <section class="slide" data-title="Motivation">
@@ -31,27 +32,64 @@
       <ul>
         <li>What's an API</li>
         <li>When do I need one</li>
-        <li>Examples: OpenAI, Azure OpenAI, Anthropic, Ollama, vLLM</li>
-        <li>Local inference places: your laptop, HMS HPC clusters (O2), CCB servers</li>
+        <li>
+          Examples
+          <ul>
+            <li>OpenAI, Azure OpenAI</li>
+            <li>Anthropic</li>
+            <li>Ollama, vLLM</li>
+          </ul>
+        </li>
       </ul>
+      <div class="card">
+        <p class="callout">LOCAL? INFERENCE?<br />GUI or API?</p>
+        <h3>Local inference places</h3>
+        <ul>
+          <li>Your laptop</li>
+          <li>HMS HPC Clusters O2</li>
+          <li>CCB servers</li>
+        </ul>
+      </div>
     </section>
 
     <section class="slide" data-title="Model serving software">
       <h2>Model Serving Software</h2>
       <ul>
-        <li>Ollama, vLLM</li>
-        <li>"Bare metal" vs. container</li>
-        <li>Setting up a model server: on your laptop, at HMS on the HPC cluster, in the cloud</li>
-        <li><a href="https://github.com/ccb-hms/LLMTools-HMS">github.com/ccb-hms/LLMTools-HMS</a></li>
+        <li>Ollama</li>
+        <li>VLLM</li>
+        <li>On "bare metal" vs. container</li>
       </ul>
+      <div class="card">
+        <h3>Setting up a model server</h3>
+        <ul>
+          <li>On your laptop for local inference</li>
+          <li>
+            At HMS on the HPC cluster
+            <a class="chip" href="https://github.com/ccb-hms/LLMTools-HMS">github.com/ccb-hms/LLMTools-HMS</a>
+          </li>
+          <li>In the cloud</li>
+        </ul>
+      </div>
     </section>
 
     <section class="slide" data-title="Inference stack architecture">
       <h2>Architecture of an AI Inference Stack</h2>
       <ul>
-        <li>Hardware (GPU, CPU); ARM vs Intel</li>
+        <li>
+          Hardware (GPU, CPU)
+          <ul>
+            <li>ARM vs Intel</li>
+          </ul>
+        </li>
         <li>OS loads device driver</li>
-        <li>SDKs on top of drivers (CUDA, cuDNN, TensorRT, &hellip;); bare metal vs containers</li>
+        <li>
+          SDKs on top of drivers
+          <ul>
+            <li>CUDA, cuDNN, TensorRT, &hellip;</li>
+            <li>"bare metal"</li>
+            <li>Containers</li>
+          </ul>
+        </li>
         <li>Frameworks on top of SDKs (transformers, etc.)</li>
         <li>Open weight model</li>
         <li>Model serving software</li>
@@ -91,7 +129,7 @@
       <ul>
         <li>Bigger window &rarr; more information attended to at inference time</li>
         <li>Bigger window needs more HBM / RAM</li>
-        <li>Common max context window sizes, and real world interpretation (e.g. what can I fit in 128k tokens?)</li>
+        <li>Common max context window sizes, and real world interpretation (e.g., what can I fit in 128k tokens?)</li>
       </ul>
     </section>
 
@@ -99,8 +137,20 @@
       <h2>Guidance for Local Hardware</h2>
       <ul>
         <li>What types of problems can we solve on various hardware</li>
-        <li>Intel / ARM servers with NVIDIA GPUs: DGX, Dell, Grace Hopper / Blackwell</li>
-        <li>Desktop workstations: Intel with NVIDIA GPUs, NVIDIA ARM, Apple Silicon (Mac Studio)</li>
+        <li>
+          Intel / ARM servers with NVIDIA GPUs
+          <ul>
+            <li>DGX, Dell, Grace Hopper / Blackwell</li>
+          </ul>
+        </li>
+        <li>
+          Desktop workstations
+          <ul>
+            <li>Intel with NVIDIA GPUs</li>
+            <li>NVIDIA ARM</li>
+            <li>Apple Silicon (Mac Studio)</li>
+          </ul>
+        </li>
       </ul>
     </section>
 
@@ -111,10 +161,20 @@
     <section class="slide" data-title="Next steps">
       <h2>Resources for your next steps</h2>
       <ul>
-        <li>Git repos maintained by CCB</li>
-        <li>NVIDIA registry</li>
-        <li>Reading material for a deeper dive: research papers, "Build a LLM from Scratch", etc.</li>
-        <li>Helpful blog posts, etc.</li>
+        <li>
+          Pointers to:
+          <ul>
+            <li>Git repos maintained by CCB</li>
+            <li>NVIDIA registry</li>
+            <li>
+              Reading material for deeper dive
+              <ul>
+                <li>Research papers, "Build a LLM from Scratch", etc.</li>
+              </ul>
+            </li>
+            <li>Pointers to helpful blog posts, etc.</li>
+          </ul>
+        </li>
       </ul>
     </section>
   </div>

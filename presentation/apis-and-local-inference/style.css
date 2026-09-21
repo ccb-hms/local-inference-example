@@ -3,13 +3,19 @@
   --fg: #1a1a1a;
   --bg: #ffffff;
   --muted: #666;
+  --accent: #2f5d9e;
+  --card-bg: #f4f6f9;
+  --card-border: #e2e6ec;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --fg: #f0f0f0;
-    --bg: #1a1a1a;
-    --muted: #aaa;
+    --bg: #17181a;
+    --muted: #9a9a9a;
+    --accent: #7aa7e6;
+    --card-bg: #202226;
+    --card-border: #2c2f34;
   }
 }
 
@@ -32,35 +38,111 @@ body {
 .slide {
   position: absolute;
   inset: 0;
-  display: none;
+  display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 4rem 6rem;
   overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
 }
 
 .slide.active {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .slide h1 {
   font-size: 3rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin-bottom: 0.5rem;
 }
 
 .slide h2 {
   font-size: 2.25rem;
-  margin-bottom: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 1.75rem;
+}
+
+.slide h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
 }
 
 .slide .byline {
   color: var(--muted);
   font-size: 1.25rem;
+  margin: 0;
+}
+
+.slide .attribution {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-style: italic;
+  margin-top: 2rem;
 }
 
 .slide ul {
   font-size: 1.4rem;
-  line-height: 1.6;
+  line-height: 1.65;
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.slide ul ul {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-top: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.slide li {
+  margin-bottom: 0.4rem;
+}
+
+.card {
+  margin-top: 2rem;
+  padding: 1.5rem 1.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  max-width: 34rem;
+}
+
+.card .callout {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.4;
+}
+
+.card ul {
+  font-size: 1.2rem;
+}
+
+.chip {
+  display: inline;
+  margin-left: 0.6rem;
+  white-space: nowrap;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--accent);
+  font-size: 0.75em;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.chip:hover {
+  border-color: var(--accent);
 }
 
 #controls {
@@ -80,9 +162,15 @@ body {
   background: transparent;
   color: var(--fg);
   cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+#controls button:hover {
+  border-color: var(--accent);
 }
 
 #progress {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
 }
