@@ -1,7 +1,15 @@
 // Slide content for the deck, kept separate from rendering (app.js) and
-// styling (style.css). Each item in a list is either a plain string, or an
-// object { text, children, chip } where `children` is a nested list (same
-// shape, recursively) and `chip` renders a small pill-style link.
+// styling (style.css). Slide shapes:
+//   { type: "title", title, byline, attribution }
+//   { type: "section", title }            -- a divider slide between parts of the talk
+//   { type: "content", title, items, cards }
+// Each item in a list is either a plain string, or an object
+// { text, children, chip } where `children` is a nested list (same shape,
+// recursively) and `chip` renders a small pill-style link.
+//
+// One idea per slide: each "content" slide below covers a single point from
+// the source deck rather than a whole dense bullet list, grouped into named
+// sections with a divider slide in front of each group.
 
 const SLIDES = [
   {
@@ -10,30 +18,40 @@ const SLIDES = [
     byline: "Jane Adams",
     attribution: "Adapted from a talk by Andreas Werdich and Nathan Palmer",
   },
+
+  // --- Motivation ---
+  { type: "section", title: "Motivation: API vs Chatbot/GUI" },
   {
     type: "content",
-    title: "Motivation: API vs Chatbot/GUI",
+    title: "Control and Reproducibility",
     items: [
       "Programmatic access: inference on large data sets",
       "Hyperparameter control (temp, top_p, num_completions, …)",
       "Structured outputs (e.g. for zero-shot text classification)",
       "Reproducibility, model versions, checkpoints",
-      "Performance guarantees",
-      "Security, privacy, compliance",
-      "Cost control",
     ],
   },
   {
     type: "content",
-    title: "Local inference",
-    items: [
-      "What's an API",
-      "When do I need one",
-      {
-        text: "Examples",
-        children: ["OpenAI, Azure OpenAI", "Anthropic", "Ollama, vLLM"],
-      },
-    ],
+    title: "Operational Guarantees",
+    items: ["Performance guarantees", "Security, privacy, compliance", "Cost control"],
+  },
+
+  // --- Local inference ---
+  { type: "section", title: "Local Inference" },
+  {
+    type: "content",
+    title: "What's an API, and When Do You Need One",
+    items: ["What's an API", "When do I need one"],
+  },
+  {
+    type: "content",
+    title: "Examples",
+    items: ["OpenAI, Azure OpenAI", "Anthropic", "Ollama, vLLM"],
+  },
+  {
+    type: "content",
+    title: "Local Inference Places",
     cards: [
       {
         callout: ["LOCAL? INFERENCE?", "GUI or API?"],
@@ -42,10 +60,17 @@ const SLIDES = [
       },
     ],
   },
+
+  // --- Model serving software ---
+  { type: "section", title: "Model Serving Software" },
   {
     type: "content",
-    title: "Model Serving Software",
+    title: "Ollama vs. vLLM",
     items: ["Ollama", "VLLM", 'On "bare metal" vs. container'],
+  },
+  {
+    type: "content",
+    title: "Setting Up a Model Server",
     cards: [
       {
         heading: "Setting up a model server",
@@ -63,9 +88,12 @@ const SLIDES = [
       },
     ],
   },
+
+  // --- Architecture of an AI inference stack ---
+  { type: "section", title: "Architecture of an AI Inference Stack" },
   {
     type: "content",
-    title: "Architecture of an AI Inference Stack",
+    title: "The Full Stack",
     items: [
       { text: "Hardware (GPU, CPU)", children: ["ARM vs Intel"] },
       "OS loads device driver",
@@ -80,6 +108,44 @@ const SLIDES = [
       "Client",
     ],
   },
+  {
+    type: "content",
+    title: "Hardware",
+    items: [{ text: "GPU, CPU", children: ["ARM vs Intel"] }],
+  },
+  {
+    type: "content",
+    title: "OS Loads Device Driver",
+  },
+  {
+    type: "content",
+    title: "SDKs on Top of Drivers",
+    items: ["CUDA, cuDNN, TensorRT, …", '"bare metal"', "Containers"],
+  },
+  {
+    type: "content",
+    title: "Frameworks on Top of SDKs",
+    items: ["transformers, etc."],
+  },
+  {
+    type: "content",
+    title: "Open Weight Model",
+  },
+  {
+    type: "content",
+    title: "Model Serving Software",
+  },
+  {
+    type: "content",
+    title: "API",
+  },
+  {
+    type: "content",
+    title: "Client",
+  },
+
+  // --- Under the hood: containers, the forward pass, memory ---
+  { type: "section", title: "Under the Hood" },
   {
     type: "content",
     title: "Containers",
@@ -111,45 +177,47 @@ const SLIDES = [
       "Common max context window sizes, and real world interpretation (e.g., what can I fit in 128k tokens?)",
     ],
   },
+
+  // --- Hardware guidance ---
+  { type: "section", title: "Guidance for Local Hardware" },
   {
     type: "content",
-    title: "Guidance for Local Hardware",
+    title: "Matching Problems to Hardware",
+    items: ["What types of problems can we solve on various hardware"],
+  },
+  {
+    type: "content",
+    title: "Servers",
     items: [
-      "What types of problems can we solve on various hardware",
       {
         text: "Intel / ARM servers with NVIDIA GPUs",
         children: ["DGX, Dell, Grace Hopper / Blackwell"],
-      },
-      {
-        text: "Desktop workstations",
-        children: [
-          "Intel with NVIDIA GPUs",
-          "NVIDIA ARM",
-          "Apple Silicon (Mac Studio)",
-        ],
       },
     ],
   },
   {
     type: "content",
-    title: "Hardware Options at HMS (O2, Longwood)",
+    title: "Desktop Workstations",
+    items: ["Intel with NVIDIA GPUs", "NVIDIA ARM", "Apple Silicon (Mac Studio)"],
   },
   {
     type: "content",
-    title: "Resources for your next steps",
+    title: "Hardware Options at HMS (O2, Longwood)",
+  },
+
+  // --- Resources ---
+  { type: "section", title: "Resources for Your Next Steps" },
+  {
+    type: "content",
+    title: "Where to Go From Here",
+    items: ["Git repos maintained by CCB", "NVIDIA registry"],
+  },
+  {
+    type: "content",
+    title: "Reading and Further Study",
     items: [
-      {
-        text: "Pointers to:",
-        children: [
-          "Git repos maintained by CCB",
-          "NVIDIA registry",
-          {
-            text: "Reading material for deeper dive",
-            children: ['Research papers, "Build a LLM from Scratch", etc.'],
-          },
-          "Pointers to helpful blog posts, etc.",
-        ],
-      },
+      'Research papers, "Build a LLM from Scratch", etc.',
+      "Pointers to helpful blog posts, etc.",
     ],
   },
 ];

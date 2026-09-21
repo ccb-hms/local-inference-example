@@ -96,8 +96,21 @@ function renderContentSlide(slide) {
   return section;
 }
 
+function renderSectionSlide(slide) {
+  const section = document.createElement("section");
+  section.className = "slide section-slide";
+
+  const h2 = document.createElement("h2");
+  h2.textContent = slide.title;
+  section.appendChild(h2);
+
+  return section;
+}
+
 function renderSlide(slide) {
-  return slide.type === "title" ? renderTitleSlide(slide) : renderContentSlide(slide);
+  if (slide.type === "title") return renderTitleSlide(slide);
+  if (slide.type === "section") return renderSectionSlide(slide);
+  return renderContentSlide(slide);
 }
 
 const deck = document.getElementById("deck");
@@ -122,9 +135,6 @@ function show(index, { updateHash = true } = {}) {
     history.replaceState(null, "", `#${current + 1}`);
   }
 }
-
-document.getElementById("prev").addEventListener("click", () => show(current - 1));
-document.getElementById("next").addEventListener("click", () => show(current + 1));
 
 window.addEventListener("keydown", (event) => {
   if (["ArrowRight", " ", "PageDown"].includes(event.key)) show(current + 1);
