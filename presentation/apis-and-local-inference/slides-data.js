@@ -205,6 +205,40 @@ const SLIDES = [
     title: "Hardware Options at HMS (O2, Longwood)",
   },
 
+  // --- Hands-on demo ---
+  { type: "section", title: "Today's Hands-On Demo" },
+  {
+    type: "content",
+    title: "What You'll Run",
+    items: [
+      "A small open-weight model (Qwen2.5-1.5B) running entirely on your laptop, no GPU required",
+      "Wrapped in an agentic tool loop that calls a real public bioinformatics API (GTEx)",
+      "A browser UI that narrates every tool call live, as it actually happens",
+    ],
+  },
+  {
+    type: "content",
+    title: "How It's Wired Together",
+    items: [
+      "Browser UI sends your question over a streamed connection (Server-Sent Events)",
+      "Local model decides which tool to call, and in what order",
+      {
+        text: "Agent loop calls four atomic tools against GTEx",
+        children: ["resolve_gene → fetch_gene_expression → summarize / plot"],
+      },
+      "Each step streams back to the browser the instant it's produced",
+    ],
+  },
+  {
+    type: "content",
+    title: "What to Watch For",
+    items: [
+      "Constrained decoding (outlines) guarantees syntactically valid tool calls, not correct judgment",
+      "MAX_STEPS caps runaway loops — a real safety mechanism, not a nicety",
+      "Check the model's claims against the chart: it can name the wrong gene with total confidence",
+    ],
+  },
+
   // --- Resources ---
   { type: "section", title: "Resources for Your Next Steps" },
   {
