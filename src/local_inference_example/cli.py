@@ -32,8 +32,19 @@ def main() -> None:
             "without changing the CLI. Default: %(default)s."
         ),
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Hugging Face repo id of a dense, full-precision instruct model to run "
+            "instead of --model-size (e.g. a model found with "
+            "scripts/find_hardware_model.py). Must be loadable with "
+            "transformers' AutoModelForCausalLM - quantized GGUF/MLX/AWQ/EXL2 builds "
+            "won't work."
+        ),
+    )
     args = parser.parse_args()
-    server.model_name = MODEL_SIZES[args.model_size]
+    server.model_name = args.model or MODEL_SIZES[args.model_size]
 
     print(f"Preparing model: {server.model_name}")
     server.get_llm()  # downloads (first run only) and loads before the server opens

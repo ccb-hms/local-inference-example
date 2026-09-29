@@ -155,11 +155,41 @@ uv run local-inference-example --model-size 3.8b   # default (Phi-3.5-mini-instr
 Only one size is offered today - `--model-size` exists so a second tier
 can be added later without changing the CLI. To try a different model
 entirely, add an entry to `MODEL_SIZES` in
-[model.py](src/local_inference_example/model.py). Any instruction-tuned
-causal LM with a working `apply_chat_template` works here, regardless of
-whether it has its own native tool-calling format: `model.py` constrains
-raw token output directly against the `AgentStep` schema (see below), so
-it never depends on a model's own tool-call conventions.
+[model.py](src/local_inference_example/model.py), or pass `--model` (see
+below) to try one without editing code. Any instruction-tuned causal LM
+with a working `apply_chat_template` works here, regardless of whether it
+has its own native tool-calling format: `model.py` constrains raw token
+output directly against the `AgentStep` schema (see below), so it never
+depends on a model's own tool-call conventions.
+
+### Finding a model that fits your hardware
+
+```bash
+uv run python scripts/find_hardware_model.py
+uv run python scripts/find_hardware_model.py --use-case general --limit 10
+```
+
+[scripts/find_hardware_model.py](scripts/find_hardware_model.py) runs
+[llmfit](https://github.com/AlexsJones/llmfit) (via `uvx`, so nothing extra
+needs installing) to detect your CPU, RAM, and GPU/VRAM, and prints the
+models it scores highest for that hardware, each linked to its Hugging Face
+page. It defaults to `--use-case coding`, since this project's agent loop
+depends on the model reliably producing structured tool calls rather than
+freeform chat. Try one directly, no code changes:
+
+```bash
+uv run local-inference-example --model microsoft/Phi-4-mini-instruct
+```
+
+llmfit's model database is mostly individual accounts' fine-tunes and
+quantizations, and its scoring favors already-quantized builds (smaller
+memory footprint) over the dense, full-precision weights this project's
+`transformers`-based loader (`AutoModelForCausalLM`) actually needs. By
+default the script filters to `KNOWN_PUBLISHERS`, a small allowlist of
+organizations that publish official base/instruct weights, and drops repo
+names that look like a GGUF/MLX/AWQ/GPTQ/EXL2/bitsandbytes build. That's a
+heuristic, not a guarantee - pass `--all-publishers` to see llmfit's raw,
+unfiltered list instead.
 
 ## Freeing disk space
 
