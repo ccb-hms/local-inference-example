@@ -5,6 +5,21 @@ const chartEl = document.getElementById("chart");
 const detailPanelEl = document.getElementById("detail-panel");
 const detailLabelEl = document.getElementById("detail-label");
 const detailBodyEl = document.getElementById("detail-body");
+const deviceBannerEl = document.getElementById("device-banner");
+
+// Runs once on page load: tells you *why* things might be slow, instead of
+// a multi-minute wait on CPU looking indistinguishable from a hang.
+fetch("/api/status")
+  .then((res) => res.json())
+  .then(({ device, model }) => {
+    if (device === "cpu") {
+      deviceBannerEl.textContent =
+        `No GPU detected - running ${model} on CPU. Expect roughly a ` +
+        "minute per step, so a full answer can take several minutes.";
+      deviceBannerEl.hidden = false;
+    }
+  })
+  .catch(() => {}); // purely informational - a failed fetch shouldn't block the chat UI
 
 const DETAIL_LABELS = {
   action: "Code being called",
@@ -64,9 +79,24 @@ function setFormDisabled(disabled) {
 function sendMessage(message) {
   addMessage("user", message);
   setFormDisabled(true);
-  const thinking = addMessage("action", "Thinking...");
+  // Covers the round-trip before the first real "thinking" step arrives
+  // from the server; spins immediately so a slow (e.g. CPU) run doesn't
+  // sit there looking inert while the model loads/generates.
+  const placeholder = addMessage("thinking", "Thinking...");
+  placeholder.classList.add("spinning");
+  let activeSpinner = placeholder;
   let thinkingRemoved = false;
   let sawChart = false;
+
+  // Only the latest "thinking" bubble should spin - once anything else
+  // arrives, that step is done, so freeze it in place instead of leaving a
+  // trail of spinners down the whole transcript.
+  const freezeSpinner = () => {
+    if (activeSpinner) {
+      activeSpinner.classList.remove("spinning");
+      activeSpinner = null;
+    }
+  };
 
   // Real streaming, not a replay: each "step" event is pushed by the
   // server the instant run_agent_stream produces it, so a bubble appears
@@ -76,6 +106,7 @@ function sendMessage(message) {
 
   const finish = () => {
     source.close();
+    freezeSpinner();
     if (!sawChart) {
       chartEl.innerHTML = '<p class="chart-placeholder">(this answer didn\'t produce a chart)</p>';
     }
@@ -85,11 +116,18 @@ function sendMessage(message) {
 
   source.addEventListener("step", (event) => {
     if (!thinkingRemoved) {
-      thinking.remove();
+      placeholder.remove();
+      activeSpinner = null;
       thinkingRemoved = true;
+    } else {
+      freezeSpinner();
     }
     const entry = JSON.parse(event.data);
-    addMessage(entry.kind, entry.text, entry.detail);
+    const el = addMessage(entry.kind, entry.text, entry.detail);
+    if (entry.kind === "thinking") {
+      el.classList.add("spinning");
+      activeSpinner = el;
+    }
     if (entry.detail) {
       showDetail(entry.kind, entry.detail);
     }
@@ -104,7 +142,8 @@ function sendMessage(message) {
 
   source.onerror = () => {
     if (!thinkingRemoved) {
-      thinking.remove();
+      placeholder.remove();
+      activeSpinner = null;
     }
     addMessage("final", "Something went wrong talking to the server.");
     finish();

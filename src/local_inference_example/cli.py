@@ -27,9 +27,9 @@ def main() -> None:
         choices=sorted(MODEL_SIZES),
         default=DEFAULT_MODEL_SIZE,
         help=(
-            "Qwen2.5-Instruct size to run. 0.5b is smaller/faster but noticeably "
-            "less reliable at picking the right tool - see the README's "
-            "outlines-vs-native comparison. Default: %(default)s."
+            "Phi-3.5-Instruct size to run. Only one size is offered today; "
+            "the flag exists so a smaller/larger size can be added later "
+            "without changing the CLI. Default: %(default)s."
         ),
     )
     args = parser.parse_args()
