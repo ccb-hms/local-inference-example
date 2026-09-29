@@ -29,6 +29,16 @@ def get_llm() -> LocalLLM:
     return _llm
 
 
+@app.get("/api/status")
+def status() -> dict:
+    """Which model and device are actually running, so the frontend can
+    show a "running on CPU, this will be slow" banner instead of leaving a
+    multi-minute wait unexplained. cli.py loads the model before the server
+    starts, so get_llm() here is always a cheap cache hit, never a load."""
+    llm = get_llm()
+    return {"model": model_name, "device": llm.device}
+
+
 def _sse(event: str, data: dict) -> str:
     """Format one Server-Sent Event message: a labeled chunk the browser can read as it arrives."""
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"

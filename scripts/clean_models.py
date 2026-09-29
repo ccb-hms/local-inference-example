@@ -1,6 +1,6 @@
 """Deletes the Hugging Face models this project downloads, freeing disk space.
 
-Only removes cache entries matching MODEL_SIZES in model.py (Qwen2.5-*-Instruct)
+Only removes cache entries matching MODEL_SIZES in model.py (Phi-3.5-*-instruct)
 - it won't touch unrelated models in your shared Hugging Face cache.
 
 Usage: uv run python scripts/clean_models.py [--yes]

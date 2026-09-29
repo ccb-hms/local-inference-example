@@ -32,7 +32,7 @@ uv sync
 uv run local-inference-example
 ```
 
-`uv run` downloads the model before it opens the browser (~3GB, cached
+`uv run` downloads the model before it opens the browser (~7GB, cached
 under `~/.cache/huggingface` for next time), with a progress bar so you can
 watch how long it's got left. After that, http://127.0.0.1:8000 opens with
 the model already loaded and ready to answer. Every question still needs
@@ -55,7 +55,7 @@ flowchart LR
     subgraph laptop["Your laptop (offline-capable)"]
         You["You type a question"] --> UI["Browser UI\n(plain HTML/JS, EventSource)"]
         UI -- "GET /api/chat/stream" --> Server["FastAPI server\n(Server-Sent Events)"]
-        Server --> LLM["Qwen2.5-1.5B\n(local, CPU/MPS/GPU)"]
+        Server --> LLM["Phi-3.5-mini-instruct\n(local, CPU/MPS/GPU)"]
         LLM -- "JSON tool call\n(schema-constrained)" --> Loop["agent loop\n(a generator)"]
         Loop --> LLM
         LLM -- "final_answer" --> Server
@@ -72,7 +72,7 @@ Server-Sent Events response, and the browser's `EventSource` renders each
 one as it arrives. The chart itself appears the moment
 `plot_gene_expression` finishes, well before the whole run is done.
 
-The model is [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct),
+The model is [Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct),
 small enough to run on a laptop CPU with no GPU required.
 
 ## The pipeline is four atomic tools
@@ -149,17 +149,18 @@ valid; it says nothing about whether calling it was the right call.
 ## Swapping in a different model
 
 ```bash
-uv run local-inference-example --model-size 0.5b   # ~1GB, faster, less reliable
-uv run local-inference-example --model-size 1.5b    # default
+uv run local-inference-example --model-size 3.8b   # default (Phi-3.5-mini-instruct)
 ```
 
-`Qwen/Qwen2.5-0.5B-Instruct` still produces syntactically valid tool calls
-(that's what the JSON schema constraint guarantees), but noticeably more
-often skips a step or loops instead of giving a final answer, a good
-illustration of the difference between constraining a model's *syntax*
-versus its *judgment*. For any other model, change `MODEL_SIZES` in
+Only one size is offered today - `--model-size` exists so a second tier
+can be added later without changing the CLI. To try a different model
+entirely, add an entry to `MODEL_SIZES` in
 [model.py](src/local_inference_example/model.py), or pass `--model` (see
-below) to try one without editing code.
+below) to try one without editing code. Any instruction-tuned causal LM
+with a working `apply_chat_template` works here, regardless of whether it
+has its own native tool-calling format: `model.py` constrains raw token
+output directly against the `AgentStep` schema (see below), so it never
+depends on a model's own tool-call conventions.
 
 ### Finding a model that fits your hardware
 
@@ -177,7 +178,7 @@ depends on the model reliably producing structured tool calls rather than
 freeform chat. Try one directly, no code changes:
 
 ```bash
-uv run local-inference-example --model Qwen/Qwen2.5-3B-Instruct
+uv run local-inference-example --model microsoft/Phi-4-mini-instruct
 ```
 
 llmfit's model database is mostly individual accounts' fine-tunes and
@@ -192,7 +193,7 @@ unfiltered list instead.
 
 ## Freeing disk space
 
-The downloaded weights (~1-3GB per size) sit in your shared Hugging Face
+The downloaded weights (several GB per size) sit in your shared Hugging Face
 cache under `~/.cache/huggingface`. To delete just the models this project
 downloaded, without touching any other cached models:
 
@@ -214,8 +215,8 @@ A few things worth calling out live:
   valid JSON, but it doesn't guarantee the model calls the tools in a
   sensible order or stops once it has enough information. See
   [agent.py](src/local_inference_example/agent.py)'s stall-detection
-  fallback, which exists because even Qwen2.5-1.5B occasionally re-issues
-  the same tool call instead of answering. This is the difference between
+  fallback, which exists because even Phi-3.5-mini-instruct occasionally
+  re-issues the same tool call instead of answering. This is the difference between
   constraining a model's syntax and constraining its judgment.
 - `MAX_STEPS` in [agent.py](src/local_inference_example/agent.py) caps how
   many tool calls one query can trigger, and it's a real safety mechanism:
@@ -239,21 +240,20 @@ A few things worth calling out live:
   asking a workshop audience which parts of an answer they'd trust and
   which they'd check.
 
-## Why not just use the model's native tool-calling format?
+## Why constrain decoding instead of just asking for JSON?
 
-The obvious starting point for tool use is Qwen2.5-Instruct's own
-tool-calling convention: pass `tools=` to `tokenizer.apply_chat_template`,
-and the model free-generates a
-`<tool_call>{"name": ..., "arguments": {...}}</tool_call>` block, which you
-parse yourself (`src/local_inference_example/native_model.py` prototypes
-exactly this). That block is JSON, but "the model output JSON" is a
-weaker guarantee than "the model output JSON matching the schema our
-tools need." Nothing about the chat template stops it from naming a tool
-that doesn't exist, dropping a required argument, or emitting a tissue
-name that isn't a real GTEx tissue. That gap is what you have to close.
+The obvious starting point for tool use is to ask the model nicely: put
+the expected `{"tool": ..., ...}` shape in the system prompt (see
+`SYSTEM_PROMPT` in [agent.py](src/local_inference_example/agent.py)) and
+hope the model follows it. Most capable instruction-tuned models mostly
+will, but "the model was asked to output matching JSON" is a weaker
+guarantee than "the model's output matches the schema our tools need."
+Nothing stops it from naming a tool that doesn't exist, dropping a
+required argument, or emitting a tissue name that isn't a real GTEx
+tissue - and you'd only find out by parsing the result and checking.
 
-One way to close it is to parse the JSON, validate it against the same
-pydantic `AgentStep` schema, and retry (feeding the error back to the
+One way to close that gap is to parse the output, validate it against the
+same pydantic `AgentStep` schema, and retry (feeding the error back to the
 model) whenever it fails. That works, but every retry is a full extra
 generation: each failure costs real latency, and you're still only
 lowering the failure probability rather than eliminating it.
@@ -262,36 +262,9 @@ lowering the failure probability rather than eliminating it.
 [outlines](https://github.com/dottxt-ai/outlines) to compile the
 `AgentStep` schema into a finite-state machine that restricts which
 *tokens* the model is allowed to sample at each step. The output can't
-help but be schema-valid, so there's no invalid JSON to catch and nothing
-to retry.
-
-We measured the actual difference (`scripts/compare_failure_rates.py`):
-how often raw output validates against `AgentStep` on the *first try*, no
-retries, 8 samples per query:
-
-| Model | native `<tool_call>` + pydantic | outlines (constrained decoding) |
-|---|---|---|
-| Qwen2.5-1.5B-Instruct (default) | 32/32 (100%) | 32/32 (100%) |
-| Qwen2.5-0.5B-Instruct | 24/32 (75%) | 32/32 (100%) |
-
-At the default 1.5B size, validate-and-retry would rarely even need to
-retry. At 0.5B, every native failure was the same shape: for a
-zero-argument tool (`get_time`), the model emitted `{"name": "get_time"}`
-and omitted the required `"arguments"` key entirely, instead of the
-`"arguments": {}` the Hermes spec (and our validator) requires. Outlines
-can't produce that failure: the finite-state machine makes an
-empty-but-present `arguments` object structurally unavoidable, regardless
-of model size.
-
-That specific 0.5B failure turned out to be promptable away: adding one
-sentence to the system prompt ("every tool call must include an
-`arguments` object, even for a tool with no parameters") took native's
-0.5B score from 24/32 back to 32/32. That's the real tradeoff.
-Validate-and-retry *can* get you the same reliability, but only after
-you've discovered the failure mode empirically, by shipping it or by
-running exactly this kind of eval, and patched the prompt for it, and
-you're still paying for retries on whatever failure mode you *haven't*
-found yet. Outlines rules the whole category out by construction, before
-you've even written a single test case. That's what "guarantees valid
-syntax regardless of model size" (see the note above `DEFAULT_MODEL` in
-[model.py](src/local_inference_example/model.py)) is actually buying you.
+help but be schema-invalid, so there's no invalid JSON to catch and
+nothing to retry - regardless of model size, and regardless of whether the
+model in question has any built-in notion of "tool calling" at all. That's
+what "guarantees valid syntax regardless of model size" (see the note
+above `DEFAULT_MODEL` in [model.py](src/local_inference_example/model.py))
+is actually buying you.
