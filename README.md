@@ -158,7 +158,31 @@ uv run local-inference-example --model-size 1.5b    # default
 often skips a step or loops instead of giving a final answer, a good
 illustration of the difference between constraining a model's *syntax*
 versus its *judgment*. For any other model, change `MODEL_SIZES` in
-[model.py](src/local_inference_example/model.py).
+[model.py](src/local_inference_example/model.py), or pass `--model` (see
+below) to try one without editing code.
+
+### Finding a model that fits your hardware
+
+```bash
+uv run python scripts/find_hardware_model.py
+uv run python scripts/find_hardware_model.py --use-case coding --limit 10
+```
+
+[scripts/find_hardware_model.py](scripts/find_hardware_model.py) runs
+[llmfit](https://github.com/AlexsJones/llmfit) (via `uvx`, so nothing extra
+needs installing) to detect your CPU, RAM, and GPU/VRAM, and prints the
+models it scores highest for that hardware, each linked to its Hugging Face
+page. Try one directly, no code changes:
+
+```bash
+uv run local-inference-example --model Qwen/Qwen2.5-3B-Instruct
+```
+
+Only dense, full-precision instruct models work here: `model.py` loads
+weights with `transformers`' `AutoModelForCausalLM`, so quantized GGUF/MLX/
+AWQ/EXL2 builds - the formats llmfit recommends for runtimes like llama.cpp
+or MLX - won't load. Stick to a model's plain `-Instruct` repo, not a
+quantized variant of it.
 
 ## Freeing disk space
 
