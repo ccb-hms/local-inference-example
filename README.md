@@ -178,11 +178,15 @@ page. Try one directly, no code changes:
 uv run local-inference-example --model Qwen/Qwen2.5-3B-Instruct
 ```
 
-Only dense, full-precision instruct models work here: `model.py` loads
-weights with `transformers`' `AutoModelForCausalLM`, so quantized GGUF/MLX/
-AWQ/EXL2 builds - the formats llmfit recommends for runtimes like llama.cpp
-or MLX - won't load. Stick to a model's plain `-Instruct` repo, not a
-quantized variant of it.
+llmfit's model database is mostly individual accounts' fine-tunes and
+quantizations, and its scoring favors already-quantized builds (smaller
+memory footprint) over the dense, full-precision weights this project's
+`transformers`-based loader (`AutoModelForCausalLM`) actually needs. By
+default the script filters to `KNOWN_PUBLISHERS`, a small allowlist of
+organizations that publish official base/instruct weights, and drops repo
+names that look like a GGUF/MLX/AWQ/GPTQ/EXL2/bitsandbytes build. That's a
+heuristic, not a guarantee - pass `--all-publishers` to see llmfit's raw,
+unfiltered list instead.
 
 ## Freeing disk space
 
