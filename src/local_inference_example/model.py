@@ -10,17 +10,15 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .agent import AgentStep
 
-# ~3GB download, runs comfortably on a laptop CPU. The JSON schema constraint
-# (see AgentStep) guarantees valid *syntax* regardless of model size, but
-# smaller models are noticeably less reliable at choosing the right tool -
-# Qwen2.5-0.5B-Instruct, for example, frequently loops on get_time instead of
-# giving a final_answer. 1.5B is close to the sweet spot for this demo; pass
-# --model-size 0.5b (see cli.py) to show that failure mode live.
+# ~7GB download, runs comfortably on a laptop CPU/MPS/GPU - a plain
+# text-only causal LM, no multimodal encoders to carry around. The JSON
+# schema constraint (see AgentStep) guarantees valid *syntax* regardless of
+# model size, but smaller models are noticeably less reliable at choosing
+# the right tool.
 MODEL_SIZES = {
-    "1.5b": "Qwen/Qwen2.5-1.5B-Instruct",
-    "0.5b": "Qwen/Qwen2.5-0.5B-Instruct",
+    "3.8b": "microsoft/Phi-3.5-mini-instruct",
 }
-DEFAULT_MODEL_SIZE = "1.5b"
+DEFAULT_MODEL_SIZE = "3.8b"
 DEFAULT_MODEL = MODEL_SIZES[DEFAULT_MODEL_SIZE]
 
 
@@ -48,6 +46,15 @@ class LocalLLM:
     def __init__(self, model_name: str = DEFAULT_MODEL, max_new_tokens: int = 200):
         self.max_new_tokens = max_new_tokens  # cap on how much text the model can generate per step
         self.device = pick_device()
+        if self.device == "cpu":
+            # Measured on a laptop CPU: ~60s per agent step for this model,
+            # so a multi-step query can take several minutes. Say so up
+            # front rather than let it look hung.
+            print(
+                "No GPU (CUDA/MPS) detected - running on CPU. This model is "
+                "slow on CPU: expect roughly a minute per agent step, so a "
+                "multi-step question can take several minutes."
+            )
         # Once we've downloaded a model, load it straight from the local
         # cache instead of asking the Hub each time whether a newer revision
         # exists - so a plain `uv run` never re-downloads it.
@@ -60,6 +67,11 @@ class LocalLLM:
                 model_name, local_files_only=local_only
             )
             progress.update(1)
+            # trust_remote_code=False (the default): phi3 is natively built
+            # into transformers, and the repo's own modeling_phi3.py is
+            # stale against current transformers internals (it calls a
+            # DynamicCache API that no longer exists) - the native
+            # implementation is both safer and the one that actually works.
             hf_model = AutoModelForCausalLM.from_pretrained(  # downloads the model (first run only)
                 model_name, local_files_only=local_only
             ).to(self.device)
