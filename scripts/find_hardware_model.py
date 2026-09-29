@@ -80,7 +80,7 @@ def main() -> None:
     parser.add_argument(
         "--use-case",
         choices=["general", "coding", "reasoning", "chat", "multimodal", "embedding"],
-        default="general",
+        default="coding",
         help="Filter recommendations by use case (default: %(default)s)",
     )
     parser.add_argument(

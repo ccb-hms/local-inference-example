@@ -165,14 +165,16 @@ below) to try one without editing code.
 
 ```bash
 uv run python scripts/find_hardware_model.py
-uv run python scripts/find_hardware_model.py --use-case coding --limit 10
+uv run python scripts/find_hardware_model.py --use-case general --limit 10
 ```
 
 [scripts/find_hardware_model.py](scripts/find_hardware_model.py) runs
 [llmfit](https://github.com/AlexsJones/llmfit) (via `uvx`, so nothing extra
 needs installing) to detect your CPU, RAM, and GPU/VRAM, and prints the
 models it scores highest for that hardware, each linked to its Hugging Face
-page. Try one directly, no code changes:
+page. It defaults to `--use-case coding`, since this project's agent loop
+depends on the model reliably producing structured tool calls rather than
+freeform chat. Try one directly, no code changes:
 
 ```bash
 uv run local-inference-example --model Qwen/Qwen2.5-3B-Instruct
