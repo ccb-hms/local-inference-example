@@ -209,6 +209,13 @@ is under the hood: a prompt built from markdown files, a JSON schema, and
 a `while` loop, before reaching for something like LangChain or an MCP
 server.
 
+![Spectrum from purpose-built to general-purpose: an in-process script with a fixed pipeline, this workshop demo's agent loop reachable through one route, and a full model server (Ollama/LM Studio/oMLX) reachable by any program over an OpenAI-compatible API](assets/agent-spectrum.webp)
+
+This demo sits in the middle: unlike a one-off pipeline script, the model
+stays loaded and the agent loop decides tool order at runtime; unlike a
+standalone model server, it's still reachable only through this app's own
+route, not open to any program on your machine.
+
 A few things worth calling out live:
 
 - The `AgentStep` schema guarantees the model's output always parses as
