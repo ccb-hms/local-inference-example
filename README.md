@@ -50,20 +50,7 @@ run live, token by token.
 
 ![Demo: asking the local model a gene expression question and watching it call tools live, ending in a rendered chart](assets/demo.gif)
 
-```mermaid
-flowchart LR
-    subgraph laptop["Your laptop (offline-capable)"]
-        You["You type a question"] --> UI["Browser UI\n(plain HTML/JS, EventSource)"]
-        UI -- "GET /api/chat/stream" --> Server["FastAPI server\n(Server-Sent Events)"]
-        Server --> LLM["Phi-3.5-mini-instruct\n(local, CPU/MPS/GPU)"]
-        LLM -- "JSON tool call\n(schema-constrained)" --> Loop["agent loop\n(a generator)"]
-        Loop --> LLM
-        LLM -- "final_answer" --> Server
-        Loop -. "one SSE event\nper step, live" .-> UI
-    end
-    Loop <-- "gene symbol" --> GTEx["GTEx Portal API\n(public, no key)"]
-    UI -- "vega-embed" --> Chart["rendered box plot,\nas soon as it's ready"]
-```
+![Architecture: the browser UI talks to a FastAPI server over SSE, which drives an agent loop around a local LLM that calls resolve_gene, fetch_gene_expression, summarize_expression, plot_gene_expression, and get_time](assets/server-architecture.webp)
 
 `run_agent_stream` in [agent.py](src/local_inference_example/agent.py) is a
 Python generator that `yield`s each step the instant it's produced;
