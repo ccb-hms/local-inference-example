@@ -1,142 +1,73 @@
 # Running a local chatbot with Ollama
 
-[Ollama](https://ollama.com/) is a general-purpose local model server: once it's
-running, *any* program on your machine can talk to it over an
-OpenAI-compatible HTTP API. That's a different point on the spectrum from the
-rest of this repo — see the diagram in the main
+[Ollama](https://ollama.com/) is a general-purpose local chatbot app: once
+it's running, you get a chat window on your own laptop with no setup beyond
+picking a model. That's a different point on the spectrum from the rest of
+this repo — see the diagram in the main
 [README](../README.md#workshop-notes). The agent loop in
-[agent.py](../src/local_inference_example/agent.py) is reachable only through
-this app's own route and constrains the model's output to a fixed schema.
-Ollama has no such constraint and no fixed route: it's a chatbot you can talk
-to from a terminal, a script, or any OpenAI-client library, with nothing
-hardcoded about GTEx or tool-calling.
+[agent.py](../src/local_inference_example/agent.py) only answers questions
+about gene expression, through this app's own browser UI. Ollama's chat
+window is a general-purpose chatbot: ask it anything, and — if you pick a
+vision-capable model — show it an image.
 
-This doc walks through installing Ollama, pulling a model, and talking to it
-both from the command line and from a short Python script. See
-[lm-studio.md](lm-studio.md) for the GUI-first alternative — the steps below
-are nearly identical either way, since both speak the same OpenAI-compatible
-API.
+This doc walks through opening Ollama's chat UI and uploading an image to it.
+See [lm-studio.md](lm-studio.md) for the equivalent walkthrough in LM Studio
+— the steps are nearly identical either way.
 
 ## Install
 
 - **macOS**: download from [ollama.com/download](https://ollama.com/download),
   or `brew install ollama`.
-- **Windows/Linux**: download from
-  [ollama.com/download](https://ollama.com/download), or on Linux:
-  ```bash
-  curl -fsSL https://ollama.com/install.sh | sh
-  ```
+- **Windows/Linux**: download the installer from
+  [ollama.com/download](https://ollama.com/download).
 
-Installing starts a background `ollama serve` process (on macOS/Windows it
-runs as a menu-bar app) listening on `http://localhost:11434`. If it isn't
-running, start it yourself:
+## Open the chat window
 
-```bash
-ollama serve
-```
+Launch the Ollama app. On macOS/Windows it adds an icon to the menu
+bar/system tray; click it and choose **New chat** (or **Open Ollama**) to
+bring up the chat window. On Linux, or if no window appears, run
+`ollama app` from a terminal, or just use `ollama run <model>` in the
+terminal as a text-only fallback.
 
-## Pull a model
+## Pick a vision-capable model
 
-```bash
-ollama pull phi3.5
-```
+At the top of the chat window there's a model picker. Click it and search
+for a vision/multimodal model — `llama3.2-vision`, `llava`, or `gemma3` all
+work. If it's not downloaded yet, selecting it will prompt Ollama to pull it
+first (a few GB; only needed once). A plain text model like `phi3.5` or
+`llama3.2` won't show an image-upload option, so the model choice matters
+here.
 
-This downloads the same family of model
-([Phi-3.5-mini-instruct](https://huggingface.co/microsoft/Phi-3.5-mini-instruct))
-that the rest of this repo runs by default, quantized for a laptop CPU/GPU.
-Any model in the [Ollama library](https://ollama.com/library) works the same
-way — swap `phi3.5` for `llama3.2`, `mistral`, `qwen2.5`, etc.
+## Upload an image
 
-## Chat from the terminal
+With a vision-capable model selected:
 
-```bash
-ollama run phi3.5
-```
+1. Click the **+** or paperclip icon next to the message box (or just drag
+   the image file straight into the chat window — both work).
+2. Select the image file from your laptop.
+3. Type your question in the message box — e.g. *"What does this image
+   show?"*
+4. Press Enter (or click send).
 
-This drops you into an interactive chat, entirely local — no network call
-beyond the initial download.
+The image thumbnail appears in the chat alongside your message, and the
+model's answer streams in below it, the same as a text-only reply.
 
-## Talk to it over the API
+## Why this matters for sensitive images
 
-Ollama's server exposes an OpenAI-compatible `/v1/chat/completions` endpoint,
-so anything that speaks that API can point at it with no code changes beyond
-the base URL. A plain `curl` call:
-
-```bash
-curl http://localhost:11434/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "phi3.5",
-    "messages": [{"role": "user", "content": "What is BRCA1?"}]
-  }'
-```
-
-Or from Python, using [httpx](https://www.python-httpx.org/) (already a
-dependency of this project — no `openai` package required):
-
-```python
-import httpx
-
-response = httpx.post(
-    "http://localhost:11434/v1/chat/completions",
-    json={
-        "model": "phi3.5",
-        "messages": [{"role": "user", "content": "What is BRCA1?"}],
-    },
-)
-print(response.json()["choices"][0]["message"]["content"])
-```
-
-Because the model and the API are both running on your laptop, this works
-offline once the model is pulled, and no prompt or response ever leaves your
-machine.
-
-## Multimodal: asking about an image, fully locally
-
-Some Ollama models accept images alongside text, which matters whenever the
-image itself is sensitive — a radiology image, for example, which is PHI
-and generally shouldn't be sent to a hosted API at all. Pull a vision-capable
-model:
-
-```bash
-ollama pull llama3.2-vision
-```
-
-Then send an image as a base64-encoded string alongside your question:
-
-```python
-import base64
-import httpx
-
-with open("scan.png", "rb") as f:
-    image_b64 = base64.b64encode(f.read()).decode()
-
-response = httpx.post(
-    "http://localhost:11434/api/chat",
-    json={
-        "model": "llama3.2-vision",
-        "messages": [
-            {
-                "role": "user",
-                "content": "What does this image show?",
-                "images": [image_b64],
-            }
-        ],
-        "stream": False,
-    },
-)
-print(response.json()["message"]["content"])
-```
-
-(Ollama's native `/api/chat` endpoint takes images more simply than the
-OpenAI-compatible route, which is why this example uses it instead.) The
-image file never leaves your machine — the only thing happening is a local
-HTTP request to `localhost`.
+Everything above happens entirely on your laptop: the image is read from
+disk, passed to the model in memory, and never uploaded anywhere. That
+matters whenever the image itself is sensitive — a radiology scan, for
+example, which is PHI and generally shouldn't be sent to a hosted chatbot at
+all. Once the model is downloaded, this works with no internet connection.
 
 ## Troubleshooting
 
-- `curl: (7) Failed to connect` — Ollama isn't running; start it with
-  `ollama serve` or open the app.
-- Slow first response — the model is loading into memory; subsequent
-  requests are faster as long as the model stays loaded.
-- To free disk space, remove a model with `ollama rm phi3.5`.
+- No attach/paperclip icon in the chat box — the selected model is
+  text-only; switch to a vision-capable model (see above).
+- Nothing happens when you click the menu bar icon — Ollama's background
+  service may not be running; reopen the app, or run `ollama serve` in a
+  terminal.
+- Slow first response after uploading an image — the model is loading into
+  memory; it's faster on the next message as long as it stays loaded.
+- To free disk space, remove a model from the model picker's manage-models
+  view, or run `ollama rm <model>` in a terminal.

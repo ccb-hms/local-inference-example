@@ -1,129 +1,68 @@
 # Running a local chatbot with LM Studio
 
-[LM Studio](https://lmstudio.ai/) is a general-purpose local model server with
-a desktop GUI: once its server is running, *any* program on your machine can
-talk to it over an OpenAI-compatible HTTP API. That's a different point on
-the spectrum from the rest of this repo — see the diagram in the main
+[LM Studio](https://lmstudio.ai/) is a general-purpose local chatbot app:
+once it's running, you get a chat window on your own laptop with no setup
+beyond picking a model. That's a different point on the spectrum from the
+rest of this repo — see the diagram in the main
 [README](../README.md#workshop-notes). The agent loop in
-[agent.py](../src/local_inference_example/agent.py) is reachable only through
-this app's own route and constrains the model's output to a fixed schema. LM
-Studio has no such constraint and no fixed route: it's a chatbot you can talk
-to from the GUI, a terminal, or any OpenAI-client library, with nothing
-hardcoded about GTEx or tool-calling.
+[agent.py](../src/local_inference_example/agent.py) only answers questions
+about gene expression, through this app's own browser UI. LM Studio's chat
+window is a general-purpose chatbot: ask it anything, and — if you pick a
+vision-capable model — show it an image.
 
-This doc walks through installing LM Studio, downloading a model, and
-talking to it both from the GUI and from a short Python script. See
-[ollama.md](ollama.md) for the CLI-first alternative — the steps below are
-nearly identical either way, since both speak the same OpenAI-compatible API.
+This doc walks through opening LM Studio's chat UI and uploading an image to
+it. See [ollama.md](ollama.md) for the equivalent walkthrough in Ollama — the
+steps are nearly identical either way.
 
 ## Install
 
 Download the installer for macOS, Windows, or Linux from
-[lmstudio.ai/download](https://lmstudio.ai/download).
+[lmstudio.ai/download](https://lmstudio.ai/download), and run it.
 
-## Download a model
+## Download a vision-capable model
 
-Open LM Studio, click the search icon in the left sidebar, and search for a
-model — for example `Phi-3.5-mini-instruct`, the same model the rest of this
-repo runs by default. Pick a quantized `.gguf` build sized for your hardware
-(LM Studio flags ones that fit your RAM/VRAM in green) and click **Download**.
+1. Open LM Studio and click the search/magnifying-glass icon in the left
+   sidebar (**Discover**).
+2. Search for a vision/multimodal model — `Qwen2-VL`, `LLaVA`, or `Gemma 3`
+   all work. A plain text model (like `Phi-3.5-mini-instruct`) won't show an
+   image-upload option later, so the model choice matters here.
+3. Pick a `.gguf` build sized for your hardware — LM Studio flags ones that
+   fit your RAM/VRAM in green — and click **Download**.
 
-## Chat from the GUI
+## Open the chat window
 
-Click the chat icon in the left sidebar, select the downloaded model from the
-dropdown at the top, and start typing — entirely local, no network call
-beyond the initial download.
+Click the chat-bubble icon in the left sidebar (**Chat**), then select your
+downloaded vision model from the dropdown at the top of the window to load
+it.
 
-## Start the local server
+## Upload an image
 
-Click the developer/server icon in the left sidebar (`</>`), select a loaded
-model, and click **Start Server**. By default it listens on
-`http://localhost:1234`.
+With the vision model loaded:
 
-## Talk to it over the API
+1. Click the **+** (attach) icon next to the message box (or just drag the
+   image file straight into the chat window — both work).
+2. Select the image file from your laptop.
+3. Type your question in the message box — e.g. *"What does this image
+   show?"*
+4. Press Enter (or click send).
 
-LM Studio's server exposes an OpenAI-compatible `/v1/chat/completions`
-endpoint, so anything that speaks that API can point at it with no code
-changes beyond the base URL. A plain `curl` call:
+The image thumbnail appears in the chat alongside your message, and the
+model's answer streams in below it, the same as a text-only reply.
 
-```bash
-curl http://localhost:1234/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "phi-3.5-mini-instruct",
-    "messages": [{"role": "user", "content": "What is BRCA1?"}]
-  }'
-```
+## Why this matters for sensitive images
 
-(The `model` field just needs to match whatever's loaded in LM Studio; check
-the exact name shown in the server tab.)
-
-Or from Python, using [httpx](https://www.python-httpx.org/) (already a
-dependency of this project — no `openai` package required):
-
-```python
-import httpx
-
-response = httpx.post(
-    "http://localhost:1234/v1/chat/completions",
-    json={
-        "model": "phi-3.5-mini-instruct",
-        "messages": [{"role": "user", "content": "What is BRCA1?"}],
-    },
-)
-print(response.json()["choices"][0]["message"]["content"])
-```
-
-Because the model and the API are both running on your laptop, this works
-offline once the model is downloaded, and no prompt or response ever leaves
-your machine.
-
-## Multimodal: asking about an image, fully locally
-
-Some models in LM Studio's catalog accept images alongside text, which
-matters whenever the image itself is sensitive — a radiology image, for
-example, which is PHI and generally shouldn't be sent to a hosted API at
-all. Search for and download a vision-capable model, such as
-`Qwen2-VL` or `llava`, then load it the same way as above.
-
-The OpenAI-compatible endpoint accepts images as base64 data URIs, the same
-format the hosted OpenAI vision API uses:
-
-```python
-import base64
-import httpx
-
-with open("scan.png", "rb") as f:
-    image_b64 = base64.b64encode(f.read()).decode()
-
-response = httpx.post(
-    "http://localhost:1234/v1/chat/completions",
-    json={
-        "model": "qwen2-vl",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "What does this image show?"},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_b64}"},
-                    },
-                ],
-            }
-        ],
-    },
-)
-print(response.json()["choices"][0]["message"]["content"])
-```
-
-The image file never leaves your machine — the only thing happening is a
-local HTTP request to `localhost`.
+Everything above happens entirely on your laptop: the image is read from
+disk, passed to the model in memory, and never uploaded anywhere. That
+matters whenever the image itself is sensitive — a radiology scan, for
+example, which is PHI and generally shouldn't be sent to a hosted chatbot at
+all. Once the model is downloaded, this works with no internet connection.
 
 ## Troubleshooting
 
-- `curl: (7) Failed to connect` — the server tab shows "Stopped"; click
-  **Start Server** in LM Studio.
-- Slow first response — the model is loading into memory; subsequent
-  requests are faster as long as the model stays loaded.
-- To free disk space, remove a model from the **My Models** tab in LM Studio.
+- No attach icon in the message box — the loaded model is text-only; load a
+  vision-capable model instead (see above).
+- The model dropdown is empty — you haven't downloaded a model yet; go back
+  to **Discover**.
+- Slow first response after uploading an image — the model is loading into
+  memory; it's faster on the next message as long as it stays loaded.
+- To free disk space, remove a model from the **My Models** tab.
