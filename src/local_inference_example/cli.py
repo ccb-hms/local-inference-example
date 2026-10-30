@@ -8,6 +8,8 @@ the first chat request.
 from __future__ import annotations
 
 import argparse
+import socket
+import sys
 import threading
 import webbrowser
 
@@ -18,6 +20,18 @@ from .model import DEFAULT_MODEL_SIZE, MODEL_SIZES
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    """Check before loading the model (which can take a while) rather than
+    finding out only once uvicorn tries to bind - uvicorn itself swallows
+    that OSError and just sys.exit(3)s, so catching it here wouldn't work."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return True
+        return False
 
 
 def main() -> None:
@@ -69,6 +83,15 @@ def main() -> None:
         help=f"Port to serve the app on, in case {DEFAULT_PORT} is already taken. Default: %(default)s.",
     )
     args = parser.parse_args()
+
+    if _port_in_use(HOST, args.port):
+        print(
+            f"Port {args.port} is already in use - pick another with, e.g.: "
+            f"uv run local-inference-example --port {args.port + 1}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     server.backend = args.backend
     server.model_name = args.model or MODEL_SIZES[args.model_size]
     server.hms_model_name = args.hms_model
