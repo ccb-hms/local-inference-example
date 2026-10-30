@@ -20,7 +20,7 @@ import os
 import subprocess
 from urllib.parse import urlencode
 
-from openai import OpenAI, OpenAIError
+from openai import APIConnectionError, OpenAI, OpenAIError
 
 from .agent import AgentStep
 
@@ -122,19 +122,37 @@ class HMSLLM:
             )
         self.device = "HMS inference service"  # shown by /api/status in place of a local device
         self.client = OpenAI(base_url=f"{self.endpoint}/v1", api_key=token or _resolve_token())
-        self.model = model or os.environ.get("HMS_MODEL") or self._default_model()
+        # Always list models, even when one was requested explicitly: this is the first real
+        # network call to the service, so it surfaces a VPN/connectivity problem here - the same
+        # "fail before the server opens" spirit as LocalLLM's eager download/load - rather than
+        # only on the first chat message, several steps into a stream.
+        available = self._list_models()
+        self.model = model or os.environ.get("HMS_MODEL") or self._pick_default(available)
 
-    def _default_model(self) -> str:
-        """No model requested - ask the service what it has and use the first one,
-        the same "just give me something that works" default LocalLLM's
-        DEFAULT_MODEL constant hardcodes for the local backend."""
+    def _list_models(self) -> list[str]:
         try:
-            models = self.client.models.list().data
+            return [m.id for m in self.client.models.list().data]
         except OpenAIError as e:
-            raise RuntimeError(f"Could not list models from {self.endpoint}: {e}") from e
-        if not models:
+            raise RuntimeError(self._connection_error_message(e)) from e
+
+    def _pick_default(self, available: list[str]) -> str:
+        """No model requested - use the first one the service reports, the same
+        "just give me something that works" default LocalLLM's DEFAULT_MODEL
+        constant hardcodes for the local backend."""
+        if not available:
             raise RuntimeError(f"The HMS inference service at {self.endpoint} has no models available.")
-        return models[0].id
+        return available[0]
+
+    def _connection_error_message(self, e: OpenAIError) -> str:
+        """APIConnectionError covers DNS failures, refused connections, and timeouts alike -
+        all symptoms of the same most-likely cause here, since the service is only reachable
+        from the HMS VPN (see the Troubleshooting table in LocalAiInferenceService's README)."""
+        if isinstance(e, APIConnectionError):
+            return (
+                f"Could not reach {self.endpoint} - are you connected to the HMS VPN? "
+                f"The service is unreachable without it. ({e})"
+            )
+        return f"HMS inference service at {self.endpoint} rejected the request: {e}"
 
     def generate_step(self, messages: list[dict[str, str]]) -> AgentStep:
         """Turn the conversation so far into one validated next step, via a
@@ -153,7 +171,7 @@ class HMSLLM:
                 tool_choice={"type": "function", "function": {"name": TOOL_NAME}},
             )
         except OpenAIError as e:
-            raise RuntimeError(f"HMS inference service request failed: {e}") from e
+            raise RuntimeError(self._connection_error_message(e)) from e
         if not response.choices:
             raise RuntimeError(f"No message in the response from {self.model}: {response.model_dump()}")
         tool_calls = response.choices[0].message.tool_calls
