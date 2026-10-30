@@ -101,7 +101,7 @@ class FinalAnswer(BaseModel):
     """Not a tool call - this is how the model signals "I'm done, here's the answer"."""
 
     tool: Literal["final_answer"]
-    answer: str = Field(max_length=300)
+    answer: str = Field(max_length=500)
 
 
 ToolCall = Union[
@@ -137,7 +137,9 @@ symbol, use your own knowledge to pick a well-known gene associated with it \
 disease name itself. If a gene lookup still fails, don't keep retrying the \
 same or a similar bad input - give a final_answer explaining what wasn't found.
 
-Once you know the answer, respond with: {{"tool": "final_answer", "answer": "..."}}
+Once you know the answer, respond with: {{"tool": "final_answer", "answer": "..."}}. \
+Keep the answer succinct - a sentence or two covering the key numbers and takeaway, \
+not a full walkthrough of what each tool returned.
 
 Respond with exactly one JSON object and nothing else.
 """
