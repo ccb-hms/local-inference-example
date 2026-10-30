@@ -26,7 +26,7 @@ import os
 import subprocess
 from urllib.parse import urlencode
 
-from openai import APIConnectionError, OpenAI, OpenAIError
+from openai import APIConnectionError, AuthenticationError, OpenAI, OpenAIError, PermissionDeniedError
 from pydantic import ValidationError
 
 from .agent import AgentStep, FinalAnswer
@@ -200,11 +200,20 @@ class HMSLLM:
     def _connection_error_message(self, e: OpenAIError) -> str:
         """APIConnectionError covers DNS failures, refused connections, and timeouts alike -
         all symptoms of the same most-likely cause here, since the service is only reachable
-        from the HMS VPN (see the Troubleshooting table in LocalAiInferenceService's README)."""
+        from the HMS VPN (see the Troubleshooting table in LocalAiInferenceService's README).
+        AuthenticationError/PermissionDeniedError (401/403) almost always mean the access
+        token has expired - it's short-lived (about an hour) and this class only ever reads
+        it once, at startup, so there's no way to refresh it short of restarting."""
         if isinstance(e, APIConnectionError):
             return (
                 f"Could not reach {self.endpoint} - are you connected to the HMS VPN? "
                 f"The service is unreachable without it. ({e})"
+            )
+        if isinstance(e, (AuthenticationError, PermissionDeniedError)):
+            return (
+                f"{self.endpoint} rejected the request as unauthorized ({e}). Your "
+                f"HMS_API_TOKEN has likely expired - get a fresh one (see README.md's HMS "
+                f"inference service section), update .env, and restart the app."
             )
         return f"HMS inference service at {self.endpoint} rejected the request: {e}"
 

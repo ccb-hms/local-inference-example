@@ -197,8 +197,9 @@ backend's constrained-decoding guarantee; `hms_model.py` gets the same
 structural guarantee a different way, by forcing a single tool call shaped
 like `AgentStep` instead of trusting free-text JSON.
 
-You'll need the HMS VPN and a few environment variables, which `uv run`
-picks up automatically from a `.env` file in the project root:
+You'll need the HMS VPN and a few environment variables, which `cli.py`
+loads automatically from a `.env` file in the project root (via
+[python-dotenv](https://pypi.org/project/python-dotenv/)):
 
 ```bash
 cp .env.example .env
@@ -212,12 +213,16 @@ Then edit `.env` - see the comments in
   [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
   are already filled in.
 - Credentials - either:
-  - `HMS_API_TOKEN` (recommended) - a short-lived access token. Clone
-    [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
-    and run its `./get-okta-token.sh` to get one without putting your HMS
-    password in this project at all. It expires (typically within an
-    hour), so re-run the script and update `.env` once requests start
-    getting rejected.
+  - `HMS_API_TOKEN` (recommended) - a short-lived access token, without
+    putting your HMS password in this project at all:
+    ```bash
+    gh repo clone ccb-hms/LocalAiInferenceService  # avoids needing an SSH key for GitHub
+    cd LocalAiInferenceService && ./get-okta-token.sh
+    ```
+    It expires (typically within an hour); the app's error message says so
+    once requests start getting rejected (401/403) - re-run the script,
+    update `.env`, and restart the app, since it only reads the token once,
+    at startup.
   - `HMS_USERNAME` and `HMS_PASSWORD` - lets this app fetch a token itself
     (the same Okta password grant `get-okta-token.sh` uses), simpler but
     puts your password in `.env`.
