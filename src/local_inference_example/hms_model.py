@@ -27,8 +27,9 @@ import subprocess
 from urllib.parse import urlencode
 
 from openai import APIConnectionError, OpenAI, OpenAIError
+from pydantic import ValidationError
 
-from .agent import AgentStep
+from .agent import AgentStep, FinalAnswer
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,12 @@ TOKEN_URL = f"{OKTA_URL}/oauth2/{OKTA_AUTH_SERVER_ID}/v1/token"
 SCOPE = "openid offline_access"
 
 TOOL_NAME = "agent_step"
+
+# The local backend can never produce an overlong final_answer: outlines' constrained decoding
+# enforces AgentStep's field constraints (including this one) live, during generation. The HMS
+# model has no such constraint and can ramble past it in an otherwise-correct answer - read the
+# real limit from AgentStep itself rather than hardcoding it, so the two can't drift apart.
+_FINAL_ANSWER_MAX_LENGTH = FinalAnswer.model_json_schema()["properties"]["answer"]["maxLength"]
 
 
 def get_access_token(username: str, password: str, timeout: int = 30) -> str | None:
@@ -224,4 +231,22 @@ class HMSLLM:
         tool_calls = response.choices[0].message.tool_calls
         if not tool_calls:
             raise RuntimeError(f"No tool call in the response from {self.model}: {response.model_dump()}")
-        return AgentStep.model_validate_json(tool_calls[0].function.arguments)
+        raw_json = tool_calls[0].function.arguments
+        try:
+            return AgentStep.model_validate_json(raw_json)
+        except ValidationError as e:
+            return self._recover_overlong_final_answer(raw_json, e)
+
+    def _recover_overlong_final_answer(self, raw_json: str, error: ValidationError) -> AgentStep:
+        """The one validation failure worth recovering from (see
+        _FINAL_ANSWER_MAX_LENGTH above): a final_answer whose content is fine but
+        runs past the length limit outlines would have enforced on the local
+        backend. Truncate and retry; any other shape of invalid response - a bad
+        tool call, a missing field - still raises, since those indicate an actual
+        problem rather than a backend difference."""
+        data = json.loads(raw_json).get("step", {})
+        answer = data.get("answer")
+        if data.get("tool") == "final_answer" and isinstance(answer, str) and len(answer) > _FINAL_ANSWER_MAX_LENGTH:
+            data["answer"] = answer[: _FINAL_ANSWER_MAX_LENGTH - 3] + "..."
+            return AgentStep.model_validate({"step": data})
+        raise error
