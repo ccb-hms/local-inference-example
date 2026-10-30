@@ -35,7 +35,8 @@ uv run local-inference-example
 `uv run` downloads the model before it opens the browser (~7GB, cached
 under `~/.cache/huggingface` for next time), with a progress bar so you can
 watch how long it's got left. After that, http://127.0.0.1:8000 opens with
-the model already loaded and ready to answer. Every question still needs
+the model already loaded and ready to answer (pass `--port <n>` if 8000 is
+already taken on your machine). Every question still needs
 internet, since the tools query GTEx live.
 
 ## What it does

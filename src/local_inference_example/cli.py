@@ -17,7 +17,7 @@ from . import server
 from .model import DEFAULT_MODEL_SIZE, MODEL_SIZES
 
 HOST = "127.0.0.1"
-PORT = 8000
+DEFAULT_PORT = 8000
 
 
 def main() -> None:
@@ -62,6 +62,12 @@ def main() -> None:
             "Defaults to HMS_MODEL, or the first model the service reports if that's unset."
         ),
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"Port to serve the app on, in case {DEFAULT_PORT} is already taken. Default: %(default)s.",
+    )
     args = parser.parse_args()
     server.backend = args.backend
     server.model_name = args.model or MODEL_SIZES[args.model_size]
@@ -70,8 +76,8 @@ def main() -> None:
     print(f"Preparing model: {'HMS inference service' if args.backend == 'hms' else server.model_name}")
     server.get_llm()  # downloads (first run only, local only) and loads before the server opens
 
-    url = f"http://{HOST}:{PORT}"
+    url = f"http://{HOST}:{args.port}"
     print(f"Starting local-inference-example at {url}")
     # Open the browser tab a moment after the server starts, once it's ready to answer.
     threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    uvicorn.run("local_inference_example.server:app", host=HOST, port=PORT)  # starts the web server
+    uvicorn.run("local_inference_example.server:app", host=HOST, port=args.port)  # starts the web server
