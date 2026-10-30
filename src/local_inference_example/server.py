@@ -11,21 +11,28 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .agent import run_agent_stream
+from .agent import ChatModel, run_agent_stream
 from .model import DEFAULT_MODEL, LocalLLM
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="local-inference-example")
-_llm: LocalLLM | None = None  # loaded eagerly by cli.main() before the server starts
-model_name = DEFAULT_MODEL
+_llm: ChatModel | None = None  # loaded eagerly by cli.main() before the server starts
+backend = "local"  # or "hms" - set by cli.main() before get_llm() is first called
+model_name = DEFAULT_MODEL  # local backend only: HF repo id
+hms_model_name: str | None = None  # hms backend only: None = ask the service for its default
 
 
-def get_llm() -> LocalLLM:
+def get_llm() -> ChatModel:
     """Load the model on first call, then reuse the same instance for every later request."""
     global _llm
     if _llm is None:
-        _llm = LocalLLM(model_name=model_name)
+        if backend == "hms":
+            from .hms_model import HMSLLM  # deferred: only needed for this backend
+
+            _llm = HMSLLM(model=hms_model_name)
+        else:
+            _llm = LocalLLM(model_name=model_name)
     return _llm
 
 
@@ -36,7 +43,8 @@ def status() -> dict:
     multi-minute wait unexplained. cli.py loads the model before the server
     starts, so get_llm() here is always a cheap cache hit, never a load."""
     llm = get_llm()
-    return {"model": model_name, "device": llm.device}
+    name = llm.model if backend == "hms" else llm.model_name
+    return {"model": name, "device": llm.device}
 
 
 def _sse(event: str, data: dict) -> str:

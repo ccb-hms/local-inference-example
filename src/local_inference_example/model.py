@@ -44,6 +44,7 @@ class LocalLLM:
     """Wraps a small instruction-tuned model with outlines' constrained decoding."""
 
     def __init__(self, model_name: str = DEFAULT_MODEL, max_new_tokens: int = 200):
+        self.model_name = model_name  # the HF repo id, for /api/status - distinct from self.model below
         self.max_new_tokens = max_new_tokens  # cap on how much text the model can generate per step
         self.device = pick_device()
         if self.device == "cpu":

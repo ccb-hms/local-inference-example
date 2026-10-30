@@ -35,7 +35,8 @@ uv run local-inference-example
 `uv run` downloads the model before it opens the browser (~7GB, cached
 under `~/.cache/huggingface` for next time), with a progress bar so you can
 watch how long it's got left. After that, http://127.0.0.1:8000 opens with
-the model already loaded and ready to answer. Every question still needs
+the model already loaded and ready to answer (pass `--port <n>` if 8000 is
+already taken on your machine). Every question still needs
 internet, since the tools query GTEx live.
 
 ## What it does
@@ -177,6 +178,56 @@ organizations that publish official base/instruct weights, and drops repo
 names that look like a GGUF/MLX/AWQ/GPTQ/EXL2/bitsandbytes build. That's a
 heuristic, not a guarantee - pass `--all-publishers` to see llmfit's raw,
 unfiltered list instead.
+
+## HMS inference service backend
+
+By default this project downloads and runs a model on your own machine
+(the `local` backend, above). Pass `--backend hms` to send requests to the
+HMS-provisioned [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
+instead - no download, no local GPU/CPU inference, but it needs HMS
+credentials and network access (VPN) to the service, and your prompts and
+the model's reasoning leave your laptop:
+
+```bash
+uv run local-inference-example --backend hms
+```
+
+It's OpenAI-API-compatible, so it supports tool calling but not the local
+backend's constrained-decoding guarantee; `hms_model.py` gets the same
+structural guarantee a different way, by forcing a single tool call shaped
+like `AgentStep` instead of trusting free-text JSON.
+
+You'll need the HMS VPN and a few environment variables, which `cli.py`
+loads automatically from a `.env` file in the project root (via
+[python-dotenv](https://pypi.org/project/python-dotenv/)):
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` - see the comments in
+[.env.example](.env.example) for the full rundown, but in short:
+
+- `HMS_API_ENDPOINT` and `HMS_MODEL` (required) - the service's base URL
+  and which model to request. The current values for HMS's
+  [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
+  are already filled in.
+- Credentials - either:
+  - `HMS_API_TOKEN` (recommended) - a short-lived access token, without
+    putting your HMS password in this project at all:
+    ```bash
+    gh repo clone ccb-hms/LocalAiInferenceService  # avoids needing an SSH key for GitHub
+    cd LocalAiInferenceService && ./get-okta-token.sh
+    ```
+    It expires (typically within an hour); the app's error message says so
+    once requests start getting rejected (401/403) - re-run the script,
+    update `.env`, and restart the app, since it only reads the token once,
+    at startup.
+  - `HMS_USERNAME` and `HMS_PASSWORD` - lets this app fetch a token itself
+    (the same Okta password grant `get-okta-token.sh` uses), simpler but
+    puts your password in `.env`.
+
+`--hms-model <id>` overrides `HMS_MODEL` for a single run.
 
 ## Freeing disk space
 
