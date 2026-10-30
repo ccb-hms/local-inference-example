@@ -40,14 +40,35 @@ def main() -> None:
             "instead of --model-size (e.g. a model found with "
             "scripts/find_hardware_model.py). Must be loadable with "
             "transformers' AutoModelForCausalLM - quantized GGUF/MLX/AWQ/EXL2 builds "
-            "won't work."
+            "won't work. Ignored with --backend hms."
+        ),
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["local", "hms"],
+        default="local",
+        help=(
+            "Which model backend to use. 'local' (default) downloads and runs a model on "
+            "this machine. 'hms' sends requests to the HMS-provisioned inference service "
+            "instead (see README.md's HMS inference service section) - no download, but "
+            "needs HMS credentials and VPN access to the service."
+        ),
+    )
+    parser.add_argument(
+        "--hms-model",
+        default=None,
+        help=(
+            "Model id to request from the HMS inference service (--backend hms only). "
+            "Defaults to HMS_MODEL, or the first model the service reports if that's unset."
         ),
     )
     args = parser.parse_args()
+    server.backend = args.backend
     server.model_name = args.model or MODEL_SIZES[args.model_size]
+    server.hms_model_name = args.hms_model
 
-    print(f"Preparing model: {server.model_name}")
-    server.get_llm()  # downloads (first run only) and loads before the server opens
+    print(f"Preparing model: {'HMS inference service' if args.backend == 'hms' else server.model_name}")
+    server.get_llm()  # downloads (first run only, local only) and loads before the server opens
 
     url = f"http://{HOST}:{PORT}"
     print(f"Starting local-inference-example at {url}")

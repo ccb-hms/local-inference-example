@@ -178,6 +178,37 @@ names that look like a GGUF/MLX/AWQ/GPTQ/EXL2/bitsandbytes build. That's a
 heuristic, not a guarantee - pass `--all-publishers` to see llmfit's raw,
 unfiltered list instead.
 
+## HMS inference service backend
+
+By default this project downloads and runs a model on your own machine
+(the `local` backend, above). Pass `--backend hms` to send requests to the
+HMS-provisioned [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
+instead - no download, no local GPU/CPU inference, but it needs HMS
+credentials and network access (VPN) to the service, and your prompts and
+the model's reasoning leave your laptop:
+
+```bash
+uv run local-inference-example --backend hms
+```
+
+It's OpenAI-API-compatible, so it supports tool calling but not the local
+backend's constrained-decoding guarantee; `hms_model.py` gets the same
+structural guarantee a different way, by forcing a single tool call shaped
+like `AgentStep` instead of trusting free-text JSON.
+
+Set these in your environment first (e.g. in a `.env` you `source`, or export
+directly):
+
+- `HMS_API_ENDPOINT` (required) - the service's base URL.
+- Credentials - either:
+  - `HMS_API_TOKEN` - an already-issued access token, or
+  - `HMS_USERNAME` and `HMS_PASSWORD` - your HMS credentials, exchanged for
+    a token via HMS's Okta login the same way
+    [audiotranscription](https://github.com/ccb-hms/audiotranscription)'s
+    `hmsmodel.py` does.
+- `HMS_MODEL` (optional) - which model to request. Defaults to the first
+  model the service reports, or pass `--hms-model <id>` to override per run.
+
 ## Freeing disk space
 
 The downloaded weights (several GB per size) sit in your shared Hugging Face
