@@ -3,13 +3,19 @@ locally (see https://github.com/ccb-hms/LocalAiInferenceService). No
 download or GPU/CPU inference on this machine - just an HTTPS call - but it
 needs HMS credentials and network access (VPN) to the service.
 
-The service exposes an OpenAI-compatible chat API. It supports tool calling
-but not the stricter response_format=json_schema mode, so generate_step
-gets the same structural guarantee LocalLLM gets from outlines' constrained
-decoding (always a valid AgentStep) by forcing a single tool call whose
-parameters schema *is* AgentStep, then parsing that call's arguments -
-rather than trusting the model to emit bare matching JSON as its message
-text.
+The service exposes an OpenAI-compatible chat API, but LocalLLM's structural
+guarantee (outlines' constrained decoding: the raw output is always a valid
+AgentStep) has no equivalent here - the service doesn't support
+response_format=json_schema. It does honor forced tool_choice reliably, but
+only once the conversation actually looks like tool use: agent.py's shared
+transcript (SYSTEM_PROMPT + FEW_SHOT_EXAMPLES, and every later turn
+run_agent_stream appends) models tool calls as plain assistant JSON text
+instead - the contract LocalLLM's constrained decoding relies on - and that
+pattern is strong enough to override tool_choice even when it's forced
+(confirmed empirically: the same prompt with no such history calls the tool
+every time). _to_tool_messages rewrites that transcript into real
+tool_calls/tool turns before each request, so generate_step always gets an
+actual tool call rather than ever needing to parse free-text JSON.
 """
 
 from __future__ import annotations
@@ -109,6 +115,47 @@ def _resolve_token() -> str:
     return token
 
 
+def _to_tool_messages(messages: list[dict[str, str]]) -> list[dict]:
+    """Rewrite agent.py's shared transcript - plain-JSON-text assistant turns, built for
+    the local outlines backend - into real tool_calls/tool-role turns, so every assistant
+    turn in the history models actual tool use. Without this, the forced tool_choice below
+    gets silently overridden by that text pattern (see the module docstring)."""
+    out: list[dict] = []
+    call_count = 0
+    i = 0
+    while i < len(messages):
+        message = messages[i]
+        content = message["content"]
+        if message["role"] == "assistant" and content.lstrip().startswith("{"):
+            call_count += 1
+            call_id = f"call_{call_count}"
+            out.append(
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": call_id,
+                            "type": "function",
+                            "function": {
+                                "name": TOOL_NAME,
+                                "arguments": json.dumps({"step": json.loads(content)}),
+                            },
+                        }
+                    ],
+                }
+            )
+            following = messages[i + 1] if i + 1 < len(messages) else None
+            if following is not None and following["role"] == "user" and following["content"].startswith("Observation:"):
+                out.append({"role": "tool", "tool_call_id": call_id, "content": following["content"]})
+                i += 2
+                continue
+        else:
+            out.append(message)
+        i += 1
+    return out
+
+
 class HMSLLM:
     """Same generate_step(messages) -> AgentStep interface as LocalLLM (see
     agent.ChatModel), backed by the HMS inference service instead of a
@@ -155,12 +202,12 @@ class HMSLLM:
         return f"HMS inference service at {self.endpoint} rejected the request: {e}"
 
     def generate_step(self, messages: list[dict[str, str]]) -> AgentStep:
-        """Turn the conversation so far into one validated next step, via a
-        forced tool call rather than trusting free-text JSON."""
+        """Turn the conversation so far into one validated next step, always via an
+        actual forced tool call - never by parsing free-text JSON."""
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=_to_tool_messages(messages),
                 temperature=0.0,
                 tools=[
                     {
