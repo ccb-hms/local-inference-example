@@ -14,6 +14,7 @@ import threading
 import webbrowser
 
 import uvicorn
+from dotenv import load_dotenv
 
 from . import server
 from .model import DEFAULT_MODEL_SIZE, MODEL_SIZES
@@ -35,6 +36,7 @@ def _port_in_use(host: str, port: int) -> bool:
 
 
 def main() -> None:
+    load_dotenv()  # picks up a .env in the current directory, e.g. for the --backend hms env vars
     parser = argparse.ArgumentParser(description="local-inference-example")
     parser.add_argument(
         "--model-size",

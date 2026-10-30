@@ -197,18 +197,32 @@ backend's constrained-decoding guarantee; `hms_model.py` gets the same
 structural guarantee a different way, by forcing a single tool call shaped
 like `AgentStep` instead of trusting free-text JSON.
 
-Set these in your environment first (e.g. in a `.env` you `source`, or export
-directly):
+You'll need the HMS VPN and a few environment variables, which `uv run`
+picks up automatically from a `.env` file in the project root:
 
-- `HMS_API_ENDPOINT` (required) - the service's base URL.
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` - see the comments in
+[.env.example](.env.example) for the full rundown, but in short:
+
+- `HMS_API_ENDPOINT` and `HMS_MODEL` (required) - the service's base URL
+  and which model to request. The current values for HMS's
+  [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
+  are already filled in.
 - Credentials - either:
-  - `HMS_API_TOKEN` - an already-issued access token, or
-  - `HMS_USERNAME` and `HMS_PASSWORD` - your HMS credentials, exchanged for
-    a token via HMS's Okta login the same way
-    [audiotranscription](https://github.com/ccb-hms/audiotranscription)'s
-    `hmsmodel.py` does.
-- `HMS_MODEL` (optional) - which model to request. Defaults to the first
-  model the service reports, or pass `--hms-model <id>` to override per run.
+  - `HMS_API_TOKEN` (recommended) - a short-lived access token. Clone
+    [LocalAiInferenceService](https://github.com/ccb-hms/LocalAiInferenceService)
+    and run its `./get-okta-token.sh` to get one without putting your HMS
+    password in this project at all. It expires (typically within an
+    hour), so re-run the script and update `.env` once requests start
+    getting rejected.
+  - `HMS_USERNAME` and `HMS_PASSWORD` - lets this app fetch a token itself
+    (the same Okta password grant `get-okta-token.sh` uses), simpler but
+    puts your password in `.env`.
+
+`--hms-model <id>` overrides `HMS_MODEL` for a single run.
 
 ## Freeing disk space
 
