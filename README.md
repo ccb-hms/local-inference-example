@@ -203,6 +203,13 @@ stays loaded and the agent loop decides tool order at runtime; unlike a
 standalone model server, it's still reachable only through this app's own
 route, not open to any program on your machine.
 
+For the standalone-model-server end of that spectrum, see
+[docs/ollama.md](docs/ollama.md) and [docs/lm-studio.md](docs/lm-studio.md):
+short walkthroughs for standing up a general-purpose local chatbot with
+Ollama or LM Studio, including running a multimodal model so you can ask
+questions about an image (e.g. a radiology scan) without it ever leaving
+your laptop.
+
 A few things worth calling out live:
 
 - The `AgentStep` schema guarantees the model's output always parses as
